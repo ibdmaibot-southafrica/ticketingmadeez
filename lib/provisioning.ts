@@ -34,10 +34,11 @@ export async function provisionLocation(locationId: string, opts?: { pipelineNam
 
   const pipelineName = opts?.pipelineName ?? DEFAULT_PIPELINE_NAME
 
-  const pipeline = await ghlJson<CreatedPipeline>(`/opportunities/pipelines?locationId=${locationId}`, {
+  const pipeline = await ghlJson<CreatedPipeline>(`/opportunities/pipelines`, {
     locationId,
     method: 'POST',
     body: JSON.stringify({
+      locationId,
       name: pipelineName,
       stages: TICKET_STAGES.map((s, i) => ({ name: s, position: i })),
     }),
@@ -49,6 +50,7 @@ export async function provisionLocation(locationId: string, opts?: { pipelineNam
       locationId,
       method: 'POST',
       body: JSON.stringify({
+        locationId,
         name: field.name,
         dataType: field.dataType,
         model: 'opportunity',
