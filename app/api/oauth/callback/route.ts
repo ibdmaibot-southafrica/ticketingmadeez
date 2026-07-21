@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { exchangeCode, persistInitialInstall } from '@/lib/ghl'
+import { exchangeCode, persistTokenResponse } from '@/lib/ghl'
 import { provisionLocation } from '@/lib/provisioning'
 import { env } from '@/lib/env'
 
@@ -19,19 +19,30 @@ export async function GET(req: NextRequest) {
 
   try {
     const tokens = await exchangeCode(code)
-    await persistInitialInstall(tokens)
-    if (tokens.locationId) {
+    const { locationIds } = await persistTokenResponse(tokens)
+
+    if (locationIds.length === 0) {
+      return NextResponse.redirect(`${env.APP_BASE_URL}/install/error?reason=no_locations`)
+    }
+
+    const provisionFailures: string[] = []
+    for (const locationId of locationIds) {
       try {
-        await provisionLocation(tokens.locationId)
+        await provisionLocation(locationId)
       } catch (provisionErr) {
-        console.error('[oauth/callback] provision failed', provisionErr)
-        return NextResponse.redirect(
-          `${env.APP_BASE_URL}/install/partial?locationId=${tokens.locationId}`,
-        )
+        console.error(`[oauth/callback] provision failed for ${locationId}`, provisionErr)
+        provisionFailures.push(locationId)
       }
     }
+
+    const firstLocation = locationIds[0]
+    if (provisionFailures.length === locationIds.length) {
+      return NextResponse.redirect(
+        `${env.APP_BASE_URL}/install/partial?locationId=${firstLocation}`,
+      )
+    }
     return NextResponse.redirect(
-      `${env.APP_BASE_URL}/install/success?locationId=${tokens.locationId ?? ''}`,
+      `${env.APP_BASE_URL}/install/success?locationId=${firstLocation}`,
     )
   } catch (e) {
     console.error('[oauth/callback] failed', e)
