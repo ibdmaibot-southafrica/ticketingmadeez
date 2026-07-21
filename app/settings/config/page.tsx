@@ -45,7 +45,9 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-ink/50 italic">No eligible users found in this sub-account.</p>
+                <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2">
+                  No location users found in this sub-account. Auto-assignment is idle. Add users in <b>Settings &rsaquo; My Staff</b> and new tickets will start rotating across them automatically.
+                </div>
               )}
               {pool.total > CUSTOM_DEVELOPMENT_THRESHOLD ? (
                 <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2">
