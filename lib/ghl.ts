@@ -165,9 +165,18 @@ export async function persistTokenResponse(t: TokenResponse): Promise<InstallRes
   }
   if (!t.companyId) throw new Error('Token response has neither locationId nor companyId')
 
-  const locationIds = await fetchInstalledLocations(t.access_token, t.companyId)
+  // After a fresh install, GHL's /installedLocations index can take a few seconds
+  // to reflect the new install. Retry with backoff before giving up.
+  let locationIds: string[] = []
+  for (let attempt = 0; attempt < 4; attempt++) {
+    locationIds = await fetchInstalledLocations(t.access_token, t.companyId)
+    if (locationIds.length > 0) break
+    if (attempt < 3) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+  }
   if (locationIds.length === 0) {
-    throw new Error(`No installed locations found for companyId ${t.companyId}`)
+    // Don't hard-fail: the INSTALL webhook will populate installs when GHL is ready.
+    console.warn(`[persistTokenResponse] /installedLocations still empty after retries for companyId=${t.companyId}; deferring to webhook`)
+    return { locationIds: [], companyId: t.companyId }
   }
   const saved: string[] = []
   for (const locationId of locationIds) {

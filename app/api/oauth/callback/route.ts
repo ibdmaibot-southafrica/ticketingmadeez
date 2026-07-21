@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     const { locationIds } = await persistTokenResponse(tokens)
 
     if (locationIds.length === 0) {
-      return NextResponse.redirect(`${env.APP_BASE_URL}/install/error?reason=no_locations`)
+      return NextResponse.redirect(`${env.APP_BASE_URL}/install/partial`)
     }
 
     const provisionFailures: string[] = []
