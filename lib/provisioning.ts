@@ -46,16 +46,18 @@ export async function provisionLocation(locationId: string, opts?: { pipelineNam
 
   const customFieldIds: Record<string, string> = {}
   for (const field of CUSTOM_FIELDS) {
+    const payload: Record<string, unknown> = {
+      name: field.name,
+      dataType: field.dataType,
+      model: 'opportunity',
+    }
+    if (field.options && field.options.length > 0) {
+      payload.options = field.options
+    }
     const created = await ghlJson<CreatedField>(`/locations/${locationId}/customFields`, {
       locationId,
       method: 'POST',
-      body: JSON.stringify({
-        locationId,
-        name: field.name,
-        dataType: field.dataType,
-        model: 'opportunity',
-        ...(field.options ? { options: field.options.map((v) => ({ name: v, value: v })) } : {}),
-      }),
+      body: JSON.stringify(payload),
     })
     customFieldIds[field.key] = created.customField.id
   }
