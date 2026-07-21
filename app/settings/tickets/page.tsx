@@ -43,15 +43,15 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
     <div>
       <Header
         title="Tickets"
-        subtitle={`${tickets.length} total &middot; pipeline ${pipeline.name}`}
+        subtitle={`${tickets.length} total · pipeline ${pipeline.name}`}
         plan={install.plan}
       />
-      <div className="p-6 overflow-x-auto">
-        <div className="flex gap-4 min-w-max">
+      <div className="p-6">
+        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))` }}>
           {stages.map((stage) => {
             const list = byStage.get(stage.id) ?? []
             return (
-              <div key={stage.id} className="w-80 shrink-0">
+              <div key={stage.id} className="min-w-0">
                 <div className="flex items-center justify-between px-1 mb-2">
                   <h2 className="text-sm font-heading font-bold uppercase tracking-wider text-ink/70">{stage.name}</h2>
                   <span className="text-xs text-ink/40">{list.length}</span>
