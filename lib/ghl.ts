@@ -140,28 +140,48 @@ export async function ghlJson<T = unknown>(path: string, init: GhlFetchInit): Pr
   return (await res.json()) as T
 }
 
-function tokenToInstall(t: TokenResponse, locationId: string): LocationInstall {
-  return {
-    locationId,
-    companyId: t.companyId,
-    userId: t.userId,
-    accessToken: t.access_token,
-    refreshToken: t.refresh_token,
-    expiresAt: Date.now() + t.expires_in * 1000,
-    plan: 'free',
-    installedAt: Date.now(),
-  }
+async function upsertInstallFromToken(t: TokenResponse, locationId: string): Promise<void> {
+  const existing = await getInstall(locationId)
+  const merged: LocationInstall = existing
+    ? {
+        // Preserve everything the sub-account configured (plan, pipeline, custom
+        // fields, departments, assignment cursor, etc.). Only refresh what the
+        // OAuth token actually gives us.
+        ...existing,
+        companyId: t.companyId ?? existing.companyId,
+        userId: t.userId ?? existing.userId,
+        accessToken: t.access_token,
+        refreshToken: t.refresh_token,
+        expiresAt: Date.now() + t.expires_in * 1000,
+      }
+    : {
+        locationId,
+        companyId: t.companyId,
+        userId: t.userId,
+        accessToken: t.access_token,
+        refreshToken: t.refresh_token,
+        expiresAt: Date.now() + t.expires_in * 1000,
+        plan: 'free',
+        installedAt: Date.now(),
+      }
+  await saveInstall(merged)
 }
 
 export type InstallResult = {
   locationIds: string[]
   companyId?: string
+  freshLocationIds: string[]
 }
 
 export async function persistTokenResponse(t: TokenResponse): Promise<InstallResult> {
   if (t.locationId) {
-    await saveInstall(tokenToInstall(t, t.locationId))
-    return { locationIds: [t.locationId], companyId: t.companyId }
+    const wasNew = !(await getInstall(t.locationId))
+    await upsertInstallFromToken(t, t.locationId)
+    return {
+      locationIds: [t.locationId],
+      companyId: t.companyId,
+      freshLocationIds: wasNew ? [t.locationId] : [],
+    }
   }
   if (!t.companyId) throw new Error('Token response has neither locationId nor companyId')
 
@@ -174,19 +194,21 @@ export async function persistTokenResponse(t: TokenResponse): Promise<InstallRes
     if (attempt < 3) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
   }
   if (locationIds.length === 0) {
-    // Don't hard-fail: the INSTALL webhook will populate installs when GHL is ready.
     console.warn(`[persistTokenResponse] /installedLocations still empty after retries for companyId=${t.companyId}; deferring to webhook`)
-    return { locationIds: [], companyId: t.companyId }
+    return { locationIds: [], companyId: t.companyId, freshLocationIds: [] }
   }
   const saved: string[] = []
+  const fresh: string[] = []
   for (const locationId of locationIds) {
     try {
+      const wasNew = !(await getInstall(locationId))
       const locToken = await fetchLocationToken(t.access_token, t.companyId, locationId)
-      await saveInstall(tokenToInstall({ ...locToken, companyId: t.companyId }, locationId))
+      await upsertInstallFromToken({ ...locToken, companyId: t.companyId }, locationId)
       saved.push(locationId)
+      if (wasNew) fresh.push(locationId)
     } catch (e) {
       console.error(`[persistTokenResponse] failed for locationId=${locationId}`, e)
     }
   }
-  return { locationIds: saved, companyId: t.companyId }
+  return { locationIds: saved, companyId: t.companyId, freshLocationIds: fresh }
 }
