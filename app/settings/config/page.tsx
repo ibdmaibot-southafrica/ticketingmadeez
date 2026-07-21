@@ -1,4 +1,6 @@
 import { getInstall } from '@/lib/kv'
+import { getAssignmentPoolStatus, POOL_CAPS, ENTERPRISE_THRESHOLD } from '@/lib/assignment'
+import { displayName } from '@/lib/users'
 import { Header } from '../_components/Header'
 import { NoLocation, NoInstall } from '../_components/NoLocation'
 
@@ -9,11 +11,57 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
   if (!locationId) return <NoLocation />
   const install = await getInstall(locationId)
   if (!install) return <NoInstall locationId={locationId} />
+  const pool = await getAssignmentPoolStatus(locationId)
 
   return (
     <div>
       <Header title="Settings" plan={install.plan} />
       <div className="p-8 max-w-3xl space-y-6">
+        <Panel title="Auto-assignment">
+          <p className="text-sm text-ink/70 mb-3">
+            New tickets are round-robin assigned across the users in your sub-account. The pool is capped at {POOL_CAPS[install.plan]} users on the <b>{install.plan}</b> tier.
+          </p>
+          {pool ? (
+            <>
+              <div className="grid grid-cols-3 gap-3 py-1.5 border-b border-ink/5">
+                <div className="text-xs text-ink/60 self-center">Users in sub-account</div>
+                <div className="col-span-2 text-sm text-ink">{pool.total}</div>
+              </div>
+              <div className="grid grid-cols-3 gap-3 py-1.5 border-b border-ink/5">
+                <div className="text-xs text-ink/60 self-center">In rotation</div>
+                <div className="col-span-2 text-sm text-ink">
+                  {pool.pool.length} of {pool.total} ({install.plan} tier cap: {pool.cap})
+                </div>
+              </div>
+              {pool.pool.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {pool.pool.map((u) => (
+                    <span key={u.id} className="inline-flex items-center gap-1 text-[11px] bg-emerald/10 text-emerald px-2 py-0.5 rounded">
+                      <span className="h-4 w-4 rounded-full bg-emerald/25 text-emerald text-[9px] font-bold flex items-center justify-center">
+                        {displayName(u).slice(0, 1).toUpperCase()}
+                      </span>
+                      {displayName(u)}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-ink/50 italic">No eligible users found in this sub-account.</p>
+              )}
+              {pool.needsEnterprise ? (
+                <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2">
+                  You have {pool.total} users, more than the {ENTERPRISE_THRESHOLD}-user paid cap. Assignments still work for the first {ENTERPRISE_THRESHOLD} users in the rotation. For larger teams (calendar-availability routing, load balancing, skills-based routing), contact us for the Enterprise tier: <a href="mailto:hjr@nexbdm.com" className="underline">hjr@nexbdm.com</a>.
+                </div>
+              ) : pool.overCap ? (
+                <div className="mt-4 rounded-lg bg-cyan/10 border border-cyan/30 text-ink text-xs px-3 py-2">
+                  Free tier caps auto-assign at {POOL_CAPS.free} users. Upgrade to Pro to include up to {POOL_CAPS.paid} users in the rotation.
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-xs text-ink/50 italic">Unable to load assignment pool status.</p>
+          )}
+        </Panel>
+
         <Panel title="Install info">
           <Field label="Location" value={install.locationId} mono />
           <Field label="Plan tier" value={install.plan.toUpperCase()} />

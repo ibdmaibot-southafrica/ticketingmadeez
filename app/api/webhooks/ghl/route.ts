@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { deleteInstall, getInstall, updateInstall, type PlanTier } from '@/lib/kv'
 import { provisionLocation, deprovisionLocation } from '@/lib/provisioning'
+import { autoAssignOpportunity } from '@/lib/assignment'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,6 +15,13 @@ const eventSchema = z.object({
   planId: z.string().optional(),
   plan: z.string().optional(),
   status: z.string().optional(),
+  // OpportunityCreate / OpportunityUpdate payloads: GHL sends the full opp
+  // fields at the top level, not nested. Peel out what we care about.
+  id: z.string().optional(),
+  opportunityId: z.string().optional(),
+  pipelineId: z.string().optional(),
+  pipelineStageId: z.string().optional(),
+  assignedTo: z.string().nullable().optional(),
 })
 
 function planFromPayload(p: { planId?: string; plan?: string; status?: string }): PlanTier {
@@ -71,6 +79,26 @@ export async function POST(req: NextRequest) {
         if (evt.locationId) {
           const plan = planFromPayload(evt)
           await updateInstall(evt.locationId, { plan })
+        }
+        break
+      }
+      case 'OPPORTUNITYCREATE':
+      case 'OPPORTUNITY.CREATE':
+      case 'OPPORTUNITY_CREATE':
+      case 'OPPORTUNITYCREATED':
+      case 'OPPORTUNITY.CREATED': {
+        const opportunityId = evt.id ?? evt.opportunityId
+        if (evt.locationId && opportunityId && evt.pipelineId) {
+          const result = await autoAssignOpportunity({
+            locationId: evt.locationId,
+            opportunityId,
+            pipelineId: evt.pipelineId,
+            currentAssignedTo: evt.assignedTo ?? null,
+          }).catch((e) => {
+            console.error('[webhook opportunity create] auto-assign failed', e)
+            return { skipped: 'error' as const }
+          })
+          console.log(`[webhook opportunity create] opp=${opportunityId} result=${JSON.stringify(result)}`)
         }
         break
       }

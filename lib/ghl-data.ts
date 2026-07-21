@@ -63,6 +63,8 @@ export type Ticket = {
   priority?: string
   source?: string
   description?: string
+  assignedUserId?: string
+  assignedUserName?: string
   createdAt: Date
   updatedAt: Date
   firstResponseAt?: Date
@@ -73,6 +75,7 @@ export function mapOpportunityToTicket(
   o: Opportunity,
   stages: Array<{ id: string; name: string }>,
   fieldIds: { priority?: string; source?: string; description?: string } | undefined,
+  userNames?: Map<string, string>,
 ): Ticket {
   const stage = stages.find((s) => s.id === o.pipelineStageId)
   const getField = (id?: string): string | undefined => {
@@ -90,6 +93,8 @@ export function mapOpportunityToTicket(
     priority: getField(fieldIds?.priority),
     source: getField(fieldIds?.source),
     description: getField(fieldIds?.description),
+    assignedUserId: o.assignedTo,
+    assignedUserName: o.assignedTo ? userNames?.get(o.assignedTo) : undefined,
     createdAt: new Date(o.createdAt),
     updatedAt: new Date(o.updatedAt),
   }

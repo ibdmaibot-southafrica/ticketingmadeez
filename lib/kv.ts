@@ -31,6 +31,20 @@ export type LocationInstall = {
     description?: string
   }
   departments?: Department[]
+  assignment?: AssignmentPolicy
+}
+
+export type AssignmentPolicy = {
+  enabled: boolean
+  strategy: 'round-robin'
+  // Users explicitly excluded from the pool (e.g. billing/AI bot accounts).
+  excludeUserIds?: string[]
+  // Round-robin cursor: index of the last user we assigned in the current
+  // (deterministically sorted) user list. Updated on every successful assign.
+  lastAssignedIndex?: number
+  // Set true once we've added `calendars.readonly` scope + the sub-account has
+  // calendars set up. Filters out anyone currently in a busy slot before RR.
+  respectCalendarAvailability?: boolean
 }
 
 export type Department = {

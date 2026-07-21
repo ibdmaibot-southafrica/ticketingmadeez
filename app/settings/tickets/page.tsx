@@ -1,5 +1,6 @@
 import { getInstall } from '@/lib/kv'
 import { getPipeline, listOpportunities, mapOpportunityToTicket, type Ticket } from '@/lib/ghl-data'
+import { usersById } from '@/lib/users'
 import { Header } from '../_components/Header'
 import { NoLocation, NoInstall } from '../_components/NoLocation'
 
@@ -29,9 +30,12 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
     )
   }
 
-  const opps = await listOpportunities(locationId, install.pipelineId)
+  const [opps, userNames] = await Promise.all([
+    listOpportunities(locationId, install.pipelineId),
+    usersById(locationId),
+  ])
   const stages = pipeline.stages.slice().sort((a, b) => a.position - b.position)
-  const tickets = opps.map((o) => mapOpportunityToTicket(o, stages, install.customFieldIds))
+  const tickets = opps.map((o) => mapOpportunityToTicket(o, stages, install.customFieldIds, userNames))
   const byStage = new Map<string, Ticket[]>()
   for (const stage of stages) byStage.set(stage.id, [])
   for (const t of tickets) {
@@ -88,7 +92,19 @@ function TicketCard({ t }: { t: Ticket }) {
         {t.priority ? <PriorityChip value={t.priority} /> : null}
         {t.source ? <span className="text-[10px] text-ink/50">{t.source}</span> : null}
       </div>
-      <div className="mt-2 text-[10px] text-ink/40">{formatWhen(t.updatedAt)}</div>
+      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-ink/40">
+        <span>{formatWhen(t.updatedAt)}</span>
+        {t.assignedUserName ? (
+          <span className="inline-flex items-center gap-1 text-ink/70">
+            <span className="h-4 w-4 rounded-full bg-emerald/20 text-emerald text-[9px] font-bold flex items-center justify-center">
+              {t.assignedUserName.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="truncate max-w-[110px]">{t.assignedUserName}</span>
+          </span>
+        ) : (
+          <span className="italic text-ink/40">Unassigned</span>
+        )}
+      </div>
     </div>
   )
 }
