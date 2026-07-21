@@ -30,12 +30,18 @@ export type LocationInstall = {
     source?: string
     description?: string
   }
-  departments?: Array<{
-    id: string
-    name: string
-    pipelineId: string
-    sla?: { firstResponseMinutes: number; resolutionMinutes: number }
-  }>
+  departments?: Department[]
+}
+
+export type Department = {
+  id: string
+  name: string
+  pipelineId: string
+  sla?: {
+    firstResponseMinutes: number
+    resolutionMinutes: number
+    active: boolean
+  }
 }
 
 const DDL = `
