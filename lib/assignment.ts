@@ -69,7 +69,16 @@ export async function pickNextAssignee(locationId: string): Promise<GhlUser | nu
 
   const users = await listActiveUsers(locationId).catch(() => [] as GhlUser[])
   const excluded = new Set(policy.excludeUserIds ?? [])
-  const filtered = users.filter((u) => !excluded.has(u.id))
+  let filtered = users.filter((u) => !excluded.has(u.id))
+
+  // Fallback: GHL's /users/ endpoint requires an agency-scoped token to list
+  // users. Our OAuth install gives us a location-scoped token, so this call
+  // often returns an empty list even when the sub-account has active users.
+  // Use the installing user as a one-person pool so tickets still get owned.
+  if (filtered.length === 0 && install.userId && !excluded.has(install.userId)) {
+    filtered = [{ id: install.userId }]
+  }
+
   // Cap the rotating pool by tier. Extra users beyond the cap don't
   // participate in this rotation and won't receive auto-assigned tickets.
   const cap = poolCapForPlan(install.plan)
