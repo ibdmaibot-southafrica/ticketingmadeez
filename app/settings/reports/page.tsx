@@ -1,4 +1,4 @@
-import { getInstall } from '@/lib/kv'
+import { getInstall, isPaidTier } from '@/lib/kv'
 import { readDepartments } from '@/lib/departments'
 import { getPipeline, listOpportunities, mapOpportunityToTicket, type Ticket } from '@/lib/ghl-data'
 import { Header, PaidLock } from '../_components/Header'
@@ -58,7 +58,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <LineChart data={merged14} />
         </Panel>
 
-        {install.plan === 'paid' ? (
+        {isPaidTier(install.plan) ? (
           <Panel title="By department">
             <table className="w-full text-sm">
               <thead>
@@ -94,7 +94,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 }
 
 function StatTile({ label, value, paidOnly, plan }: { label: string; value: string; paidOnly?: boolean; plan?: string }) {
-  const locked = paidOnly && plan !== 'paid'
+  const locked = paidOnly && plan !== 'paid' && plan !== 'enterprise'
   return (
     <div className="rounded-2xl border border-ink/10 bg-white p-5 relative">
       <div className="text-xs text-ink/50 uppercase tracking-wider">{label}</div>

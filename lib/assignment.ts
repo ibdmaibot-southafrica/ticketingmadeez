@@ -10,17 +10,20 @@ const DEFAULT_POLICY: AssignmentPolicy = {
 // Round-robin pool caps per tier.
 // - free: up to 3 users participate in the rotation
 // - paid: up to 15 users
-// - >15 users in the sub-account: surface a "contact us for Enterprise" message
-//   (assignment still works, capped at PAID_MAX)
+// - enterprise: up to 100 users (effectively unlimited for typical GHL sub-accounts)
+// Users beyond the cap are silently excluded from the current rotation.
 export const POOL_CAPS = {
   free: 3,
   paid: 15,
+  enterprise: 100,
 } as const
 
-export const ENTERPRISE_THRESHOLD = POOL_CAPS.paid
+// A pool larger than this triggers a "contact us for custom" banner even on
+// Enterprise (would need bespoke skills-based routing, load balancing, etc.).
+export const CUSTOM_DEVELOPMENT_THRESHOLD = POOL_CAPS.enterprise
 
 export function poolCapForPlan(plan: PlanTier): number {
-  return POOL_CAPS[plan]
+  return POOL_CAPS[plan] ?? POOL_CAPS.free
 }
 
 export type AssignmentPoolStatus = {
@@ -44,7 +47,7 @@ export async function getAssignmentPoolStatus(locationId: string): Promise<Assig
     total: users.length,
     cap,
     pool: users.slice(0, cap),
-    needsEnterprise: users.length > ENTERPRISE_THRESHOLD,
+    needsEnterprise: users.length > CUSTOM_DEVELOPMENT_THRESHOLD,
     overCap: users.length > cap,
   }
 }

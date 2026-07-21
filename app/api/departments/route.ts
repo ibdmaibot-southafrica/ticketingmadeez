@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getInstall } from '@/lib/kv'
+import { getInstall, isPaidTier } from '@/lib/kv'
 import { makeDepartmentId, upsertDepartment } from '@/lib/departments'
 
 export const runtime = 'nodejs'
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const { locationId, name, pipelineId } = parsed.data
   const install = await getInstall(locationId)
   if (!install) return NextResponse.json({ error: 'No install for this location' }, { status: 404 })
-  if (install.plan !== 'paid') {
+  if (!isPaidTier(install.plan)) {
     return NextResponse.json({ error: 'Adding departments is a Pro tier feature.' }, { status: 402 })
   }
   const departments = await upsertDepartment(locationId, {

@@ -16,11 +16,13 @@ export function Header({ title, subtitle, plan, right }: { title: string; subtit
 }
 
 function PlanBadge({ plan }: { plan: PlanTier }) {
-  return plan === 'paid' ? (
-    <span className="inline-block rounded-full bg-emerald/15 text-emerald text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5">Pro</span>
-  ) : (
-    <span className="inline-block rounded-full bg-ink/10 text-ink/70 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5">Free</span>
-  )
+  if (plan === 'enterprise') {
+    return <span className="inline-block rounded-full bg-cyan/15 text-cyan text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5">Enterprise</span>
+  }
+  if (plan === 'paid') {
+    return <span className="inline-block rounded-full bg-emerald/15 text-emerald text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5">Pro</span>
+  }
+  return <span className="inline-block rounded-full bg-ink/10 text-ink/70 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5">Free</span>
 }
 
 export function PaidLock({ message = 'Available on the Pro tier.' }: { message?: string }) {

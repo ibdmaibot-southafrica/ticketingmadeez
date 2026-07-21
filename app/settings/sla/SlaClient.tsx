@@ -11,7 +11,7 @@ export function SlaClient({ locationId, plan, departments }: { locationId: strin
   const [err, setErr] = useState<string | null>(null)
   const [savedId, setSavedId] = useState<string | null>(null)
 
-  const isPaid = plan === 'paid'
+  const isPaid = plan === 'paid' || plan === 'enterprise'
 
   function updateRow(id: string, patch: Partial<Department['sla']>) {
     setRows((cur) =>

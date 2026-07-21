@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getInstall } from '@/lib/kv'
+import { getInstall, isPaidTier } from '@/lib/kv'
 import { removeDepartment, upsertDepartment } from '@/lib/departments'
 
 export const runtime = 'nodejs'
@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const isSlaChange = 'sla' in patch && patch.sla !== undefined
   const isStructuralChange = ('name' in patch && patch.name) || ('pipelineId' in patch && patch.pipelineId)
 
-  if (install.plan !== 'paid' && (isSlaChange || isStructuralChange)) {
+  if (!isPaidTier(install.plan) && (isSlaChange || isStructuralChange)) {
     return NextResponse.json({ error: 'Editing departments/SLA is a Pro tier feature.' }, { status: 402 })
   }
 
@@ -51,7 +51,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 })
   const install = await getInstall(locationId)
   if (!install) return NextResponse.json({ error: 'No install for this location' }, { status: 404 })
-  if (install.plan !== 'paid') {
+  if (!isPaidTier(install.plan)) {
     return NextResponse.json({ error: 'Deleting departments is a Pro tier feature.' }, { status: 402 })
   }
   try {

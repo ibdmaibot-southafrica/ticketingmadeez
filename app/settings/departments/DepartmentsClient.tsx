@@ -24,7 +24,7 @@ export function DepartmentsClient({
   const [newPipelineId, setNewPipelineId] = useState<string>(pipelines[0]?.id ?? '')
   const [err, setErr] = useState<string | null>(null)
 
-  const isPaid = plan === 'paid'
+  const isPaid = plan === 'paid' || plan === 'enterprise'
   const canAdd = isPaid
 
   async function addDepartment() {

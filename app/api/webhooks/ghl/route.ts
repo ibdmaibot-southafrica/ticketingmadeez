@@ -26,8 +26,9 @@ const eventSchema = z.object({
 
 function planFromPayload(p: { planId?: string; plan?: string; status?: string }): PlanTier {
   const raw = (p.plan ?? p.planId ?? '').toString().toLowerCase()
-  if (raw.includes('paid') || raw.includes('pro') || raw.includes('premium')) return 'paid'
   if (p.status && ['cancelled', 'canceled', 'expired', 'inactive'].includes(p.status.toLowerCase())) return 'free'
+  if (raw.includes('enterprise') || raw.includes('business')) return 'enterprise'
+  if (raw.includes('paid') || raw.includes('pro') || raw.includes('premium')) return 'paid'
   return 'free'
 }
 

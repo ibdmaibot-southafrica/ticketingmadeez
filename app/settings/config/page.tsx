@@ -1,5 +1,5 @@
 import { getInstall } from '@/lib/kv'
-import { getAssignmentPoolStatus, POOL_CAPS, ENTERPRISE_THRESHOLD } from '@/lib/assignment'
+import { getAssignmentPoolStatus, POOL_CAPS, CUSTOM_DEVELOPMENT_THRESHOLD } from '@/lib/assignment'
 import { displayName } from '@/lib/users'
 import { Header } from '../_components/Header'
 import { NoLocation, NoInstall } from '../_components/NoLocation'
@@ -47,13 +47,17 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
               ) : (
                 <p className="text-xs text-ink/50 italic">No eligible users found in this sub-account.</p>
               )}
-              {pool.needsEnterprise ? (
+              {pool.total > CUSTOM_DEVELOPMENT_THRESHOLD ? (
                 <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2">
-                  You have {pool.total} users, more than the {ENTERPRISE_THRESHOLD}-user paid cap. Assignments still work for the first {ENTERPRISE_THRESHOLD} users in the rotation. For larger teams (calendar-availability routing, load balancing, skills-based routing), contact us for the Enterprise tier: <a href="mailto:hjr@nexbdm.com" className="underline">hjr@nexbdm.com</a>.
+                  You have {pool.total} users, above the {CUSTOM_DEVELOPMENT_THRESHOLD}-user Enterprise cap. Assignments still work for the first {CUSTOM_DEVELOPMENT_THRESHOLD} users. For larger teams with skills-based routing, load balancing, or calendar-availability filtering, contact us for custom: <a href="mailto:hjr@nexbdm.com" className="underline">hjr@nexbdm.com</a>.
                 </div>
-              ) : pool.overCap ? (
+              ) : pool.overCap && install.plan === 'free' ? (
                 <div className="mt-4 rounded-lg bg-cyan/10 border border-cyan/30 text-ink text-xs px-3 py-2">
-                  Free tier caps auto-assign at {POOL_CAPS.free} users. Upgrade to Pro to include up to {POOL_CAPS.paid} users in the rotation.
+                  Free tier caps auto-assign at {POOL_CAPS.free} users. Upgrade to <b>Pro</b> for up to {POOL_CAPS.paid}, or <b>Enterprise</b> for up to {POOL_CAPS.enterprise}.
+                </div>
+              ) : pool.overCap && install.plan === 'paid' ? (
+                <div className="mt-4 rounded-lg bg-cyan/10 border border-cyan/30 text-ink text-xs px-3 py-2">
+                  Pro tier caps auto-assign at {POOL_CAPS.paid} users. Upgrade to <b>Enterprise</b> to include up to {POOL_CAPS.enterprise} users in the rotation.
                 </div>
               ) : null}
             </>

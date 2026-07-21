@@ -13,7 +13,12 @@ function getPool(): Pool {
   return pool
 }
 
-export type PlanTier = 'free' | 'paid'
+export type PlanTier = 'free' | 'paid' | 'enterprise'
+
+// Anything above free unlocks Pro features (departments, SLA, reports, etc.).
+export function isPaidTier(plan: PlanTier): boolean {
+  return plan === 'paid' || plan === 'enterprise'
+}
 
 export type LocationInstall = {
   locationId: string
