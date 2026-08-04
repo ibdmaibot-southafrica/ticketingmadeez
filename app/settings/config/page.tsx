@@ -72,7 +72,6 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
           <Field label="Location" value={install.locationId} mono />
           <Field label="Plan tier" value={install.plan.toUpperCase()} />
           <Field label="Installed at" value={new Date(install.installedAt).toLocaleString()} />
-          {install.companyId ? <Field label="Company" value={install.companyId} mono /> : null}
         </Panel>
 
         <Panel title="Provisioned resources">
