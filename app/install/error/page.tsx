@@ -11,7 +11,7 @@ export default async function InstallError({ searchParams }: { searchParams: Pro
         <p className="text-xs text-ink/40 font-mono mb-6">Reason: {reason}</p>
       ) : null}
       <p className="text-sm text-ink/60">
-        Please try installing again from the GoHighLevel Marketplace. If the problem persists, contact support via the app listing.
+        Please try installing again from the Marketplace. If the problem persists, contact support via the app listing.
       </p>
     </main>
   )

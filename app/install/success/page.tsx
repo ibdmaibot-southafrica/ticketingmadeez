@@ -7,7 +7,7 @@ export default async function InstallSuccess({ searchParams }: { searchParams: P
       </div>
       <h1 className="text-3xl mb-3">Install complete</h1>
       <p className="text-ink/70 mb-8">
-        Your Support Tickets pipeline, custom fields, and auto-acknowledge workflow have been created in your sub-account. You can now start receiving tickets.
+        Your Support Tickets pipeline, custom fields, and auto-acknowledge workflow have been created in your account. You can now start receiving tickets.
       </p>
       {locationId ? (
         <p className="text-xs text-ink/40 font-mono">Location: {locationId}</p>

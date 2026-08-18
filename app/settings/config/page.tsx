@@ -19,12 +19,12 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
       <div className="p-8 max-w-3xl space-y-6">
         <Panel title="Auto-assignment">
           <p className="text-sm text-ink/70 mb-3">
-            New tickets are round-robin assigned across the users in your sub-account. The pool is capped at {POOL_CAPS[install.plan]} users on the <b>{install.plan}</b> tier.
+            New tickets are round-robin assigned across the users in your account. The pool is capped at {POOL_CAPS[install.plan]} users on the <b>{install.plan}</b> tier.
           </p>
           {pool ? (
             <>
               <div className="grid grid-cols-3 gap-3 py-1.5 border-b border-ink/5">
-                <div className="text-xs text-ink/60 self-center">Users in sub-account</div>
+                <div className="text-xs text-ink/60 self-center">Users in account</div>
                 <div className="col-span-2 text-sm text-ink">{pool.total}</div>
               </div>
               <div className="grid grid-cols-3 gap-3 py-1.5 border-b border-ink/5">
@@ -46,7 +46,7 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                 </div>
               ) : (
                 <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2">
-                  No location users found in this sub-account. Auto-assignment is idle. Add users in <b>Settings &rsaquo; My Staff</b> and new tickets will start rotating across them automatically.
+                  No location users found in this account. Auto-assignment is idle. Add users in <b>Settings &rsaquo; My Staff</b> and new tickets will start rotating across them automatically.
                 </div>
               )}
               {pool.total > CUSTOM_DEVELOPMENT_THRESHOLD ? (
@@ -83,7 +83,7 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
 
         <Panel title="Getting Started">
           <p className="text-sm text-ink/70">
-            Set up email-to-ticket and auto-acknowledge with two GHL workflows. Full guide in the marketplace listing under Documentation.
+            Set up email-to-ticket and auto-acknowledge with two Workflows. Full guide in the marketplace listing under Documentation.
           </p>
           <ul className="mt-3 text-sm text-ink/70 space-y-1 list-disc pl-5">
             <li>Route your <b>support@yourdomain.com</b> address into your Conversations inbox.</li>

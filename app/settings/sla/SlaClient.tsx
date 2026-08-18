@@ -125,7 +125,7 @@ export function SlaClient({ locationId, plan, departments }: { locationId: strin
         </p>
       ) : (
         <p className="mt-4 text-xs text-ink/50">
-          When an SLA is <b>on</b>, a workflow in the sub-account should trigger on new tickets and check the response/resolution timers. See the Getting Started guide for the workflow template.
+          When an SLA is <b>on</b>, a workflow in the account should trigger on new tickets and check the response/resolution timers. See the Getting Started guide for the workflow template.
         </p>
       )}
     </div>

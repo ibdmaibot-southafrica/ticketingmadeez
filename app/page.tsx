@@ -3,12 +3,12 @@ export default function LandingPage() {
     <main className="mx-auto max-w-3xl px-6 py-16">
       <div className="mb-8">
         <span className="inline-block rounded-full bg-cyan/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-cyan">
-          Support ticketing for GoHighLevel
+          Support ticketing helpdesk
         </span>
       </div>
       <h1 className="text-4xl md:text-5xl leading-tight mb-4">TicketingMadeEZ</h1>
       <p className="text-lg text-ink/70 mb-8">
-        A native helpdesk that runs inside your GHL sub-accounts. Pipelines, workflows, email-to-ticket, SLA tracking. No external system to log into.
+        A native helpdesk that runs inside your CRM account. Pipelines, workflows, email-to-ticket, SLA tracking. No external system to log into.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
         <Card title="Free tier">
@@ -28,7 +28,7 @@ export default function LandingPage() {
         </Card>
       </div>
       <p className="text-sm text-ink/50">
-        Install from the GoHighLevel Marketplace. Setup is one click. Support ticketing (helpdesk), not event ticketing.
+        Install from the app Marketplace. Setup is one click. Support ticketing (helpdesk), not event ticketing.
       </p>
       <footer className="mt-16 border-t border-ink/10 pt-6 text-xs text-ink/50">
         A NexBDM<sup>&trade;</sup> product.

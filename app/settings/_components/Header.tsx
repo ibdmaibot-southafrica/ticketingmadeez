@@ -33,7 +33,7 @@ export function PaidLock({ message = 'Available on the Pro tier.' }: { message?:
       </div>
       <div className="text-lg font-heading font-bold">Pro feature</div>
       <div className="text-sm text-ink/60 mt-2">{message}</div>
-      <div className="text-xs text-ink/40 mt-4">Upgrade from the app listing in the GHL Marketplace.</div>
+      <div className="text-xs text-ink/40 mt-4">Upgrade from the app listing in the Marketplace.</div>
     </div>
   )
 }

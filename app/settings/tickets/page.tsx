@@ -26,7 +26,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
     return (
       <div>
         <Header title="Tickets" plan={install.plan} />
-        <div className="p-8 text-sm text-ink/60">Pipeline {install.pipelineId} was not found in this sub-account.</div>
+        <div className="p-8 text-sm text-ink/60">Pipeline {install.pipelineId} was not found in this account.</div>
       </div>
     )
   }
