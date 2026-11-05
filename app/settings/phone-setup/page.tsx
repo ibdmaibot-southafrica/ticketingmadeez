@@ -1,10 +1,3 @@
-'use client'
-import { useEffect, useState } from 'react'
-type Ticket={applicationId:string;ticketId:string;status:string;businessType:string|null;updatedAt:string;phoneNumber:string|null}
-const labels:Record<string,string>={draft:'Client is completing details',queued:'Preparing submission',submitting:'Preparing submission',requirements_confirmation:'Awaiting sole proprietor confirmation',needs_provider_setup:'Provider setup needed',provider_review:'Provider review needed',reconciliation_required:'Check submission outcome',under_review:'Under review',approved:'Documents approved',needs_details:'Client details needed'}
-export default function PhoneSetup(){
- const [tickets,setTickets]=useState<Ticket[]>([]),[setupUrl,setSetupUrl]=useState(''),[error,setError]=useState('')
- async function load(){try{const r=await fetch('/api/integrations/nexconnect'),d=await r.json();if(!r.ok)throw new Error(d.error);setTickets(d.tickets);setSetupUrl(d.setupUrl);setError('')}catch(e){setError(e instanceof Error?e.message:'Setup tickets could not be loaded.')}}
- useEffect(()=>{void load();const timer=setInterval(()=>void load(),30000);return()=>clearInterval(timer)},[])
- return <div className="p-6 space-y-5"><h1 className="font-heading text-2xl text-ink">Phone setup tickets</h1><p className="text-slate-600">NexConnect creates and updates these tickets automatically. Identity documents stay in NexConnect.</p>{error&&<p role="alert">{error}</p>}<button onClick={()=>void load()} className="border border-slate-300 rounded px-4 py-2">Refresh</button><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th className="p-3">Ticket</th><th className="p-3">Application</th><th className="p-3">Progress</th><th className="p-3">Updated</th></tr></thead><tbody>{tickets.map(t=><tr key={t.applicationId} className="border-t border-slate-200"><td className="p-3">{t.ticketId}</td><td className="p-3">{t.businessType==='sole_prop'?'Sole proprietor':t.businessType==='business'?'Registered business':'Not selected'}</td><td className="p-3">{labels[t.status]||'Saved'}{t.phoneNumber&&<div>{t.phoneNumber}</div>}</td><td className="p-3">{new Date(t.updatedAt).toLocaleString('en-ZA',{timeZone:'Africa/Johannesburg'})}</td></tr>)}</tbody></table></div>{!tickets.length&&!error&&<p>No phone setup applications for this account yet.</p>}{setupUrl&&<a href={setupUrl} className="text-cyan">Open this account&apos;s phone setup in HighLevel</a>}</div>
-}
+import PhoneSetup from './PhoneSetupClient'
+export const dynamic='force-dynamic'
+export default function Page(){return <PhoneSetup/>}

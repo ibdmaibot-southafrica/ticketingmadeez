@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getPool, getInstall } from '@/lib/kv'
 import { COOKIE, readSession } from '@/lib/security'
-import { readyNexConnect, verifyNexConnect, ticketReference } from '@/lib/nexconnect'
+import { readyNexConnect, verifyNexConnect, ticketReference, trustedNexConnectKey } from '@/lib/nexconnect'
 export const dynamic='force-dynamic'
-const schema=z.object({applicationId:z.string().uuid(),locationId:z.string().regex(/^[a-zA-Z0-9]{10,40}$/),companyId:z.string().regex(/^[a-zA-Z0-9]{10,40}$/),version:z.number().int().positive(),status:z.enum(['draft','queued','submitting','requirements_confirmation','needs_provider_setup','provider_review','reconciliation_required','under_review','approved','needs_details']),businessType:z.enum(['sole_prop','business']).nullable(),bundleSid:z.string().regex(/^BU[0-9a-fA-F]{32}$/).nullable(),phoneNumber:z.string().regex(/^\+[1-9]\d{6,14}$/).nullable()}).strict()
+const schema=z.object({applicationId:z.string().uuid(),locationId:z.string().regex(/^[a-zA-Z0-9]{10,40}$/),companyId:z.string().regex(/^[a-zA-Z0-9]{10,40}$/),version:z.number().int().positive(),status:z.enum(['draft','queued','submitting','requirements_confirmation','needs_provider_setup','provider_review','reconciliation_required','under_review','approved','needs_details','disconnected']),businessType:z.enum(['sole_prop','business']).nullable(),bundleSid:z.string().regex(/^BU[0-9a-fA-F]{32}$/).nullable(),phoneNumber:z.string().regex(/^\+[1-9]\d{6,14}$/).nullable()}).strict()
 export async function POST(req:Request) {
  const raw=await req.text()
  if(raw.length>10000)return NextResponse.json({error:'Payload too large'},{status:413})
- if(!verifyNexConnect(raw,req.headers.get('x-nexconnect-time'),req.headers.get('x-nexconnect-signature')))return NextResponse.json({error:'Invalid integration signature'},{status:401})
+ const time=req.headers.get('x-nexconnect-time'),signature=req.headers.get('x-nexconnect-signature')
+ if(!time||!signature||Math.abs(Date.now()-Number(time))>300000)return NextResponse.json({error:'Invalid integration signature'},{status:401})
+ let key:string;try{key=await trustedNexConnectKey()}catch{return NextResponse.json({error:'Publisher verification unavailable'},{status:503})}
+ if(!verifyNexConnect(raw,time,signature,key))return NextResponse.json({error:'Invalid integration signature'},{status:401})
  let payload:unknown;try{payload=JSON.parse(raw)}catch{return NextResponse.json({error:'Invalid JSON'},{status:400})}
  const input=schema.safeParse(payload);if(!input.success)return NextResponse.json({error:'Invalid setup event'},{status:400})
  const d=input.data;await readyNexConnect()
