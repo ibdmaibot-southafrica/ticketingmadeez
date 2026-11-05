@@ -28,5 +28,6 @@ export async function GET(req:NextRequest) {
  await readyNexConnect()
  const owner=s.agencyOwner===true&&s.role==='admin'
  const result=await getPool().query('SELECT application_id,ticket_no,location_id,data,updated_at FROM tmez_nexconnect_tickets WHERE (location_id=$1 OR $3::boolean) AND company_id=$2 ORDER BY updated_at DESC LIMIT 100',[s.locationId,install.companyId,owner])
- return NextResponse.json({agencyView:owner,tickets:result.rows.map(r=>({applicationId:r.application_id,ticketId:ticketReference(r.ticket_no),...r.data,updatedAt:r.updated_at,setupUrl:`https://app.gohighlevel.com/v2/location/${r.location_id}/custom-page-link/6aec368cf6ecb7374be74187`})),setupUrl:`https://app.gohighlevel.com/v2/location/${s.locationId}/custom-page-link/6aec368cf6ecb7374be74187`})
+ const crmOrigin=install.companyId==='Htvz9qJFuz8bcVVCDoyv'?'https://ai.nexbdm.com':'https://app.gohighlevel.com'
+ return NextResponse.json({agencyView:owner,tickets:result.rows.map(r=>({applicationId:r.application_id,ticketId:ticketReference(r.ticket_no),...r.data,updatedAt:r.updated_at,setupUrl:`${crmOrigin}/v2/location/${r.location_id}/custom-page-link/6aec368cf6ecb7374be74187`})),setupUrl:`${crmOrigin}/v2/location/${s.locationId}/custom-page-link/6aec368cf6ecb7374be74187`})
 }
