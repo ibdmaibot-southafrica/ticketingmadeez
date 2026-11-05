@@ -1,3 +1,4 @@
+import { getFeaturePlan } from '@/lib/entitlements'
 import { readDepartments } from '@/lib/departments'
 import { listPipelines } from '@/lib/ghl-data'
 import { Header } from '../_components/Header'
@@ -6,7 +7,11 @@ import { DepartmentsClient } from './DepartmentsClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DepartmentsPage({ searchParams }: { searchParams: Promise<{ locationId?: string }> }) {
+export default async function DepartmentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ locationId?: string }>
+}) {
   const { locationId } = await searchParams
   if (!locationId) return <NoLocation />
   const data = await readDepartments(locationId)
@@ -19,12 +24,12 @@ export default async function DepartmentsPage({ searchParams }: { searchParams: 
       <Header
         title="Departments"
         subtitle="Route tickets to different pipelines so each team owns its own queue."
-        plan={install.plan}
+        plan={getFeaturePlan(install)}
       />
       <div className="p-8">
         <DepartmentsClient
           locationId={locationId}
-          plan={install.plan}
+          plan={getFeaturePlan(install)}
           departments={departments}
           pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))}
         />

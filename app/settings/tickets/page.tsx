@@ -1,5 +1,10 @@
+import { getFeaturePlan } from '@/lib/entitlements'
 import { getInstall } from '@/lib/kv'
-import { getPipeline, listOpportunities, mapOpportunityToTicket } from '@/lib/ghl-data'
+import {
+  getPipeline,
+  listOpportunities,
+  mapOpportunityToTicket,
+} from '@/lib/ghl-data'
 import { usersById } from '@/lib/users'
 import { Header } from '../_components/Header'
 import { NoLocation, NoInstall } from '../_components/NoLocation'
@@ -7,7 +12,11 @@ import { KanbanBoard } from './KanbanBoard'
 
 export const dynamic = 'force-dynamic'
 
-export default async function TicketsPage({ searchParams }: { searchParams: Promise<{ locationId?: string }> }) {
+export default async function TicketsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ locationId?: string }>
+}) {
   const { locationId } = await searchParams
   if (!locationId) return <NoLocation />
   const install = await getInstall(locationId)
@@ -15,8 +24,11 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
   if (!install.pipelineId) {
     return (
       <div>
-        <Header title="Tickets" plan={install.plan} />
-        <div className="p-8 text-sm text-ink/60">Support Tickets pipeline is not provisioned yet. Reinstall the app to fix this.</div>
+        <Header title="Tickets" plan={getFeaturePlan(install)} />
+        <div className="p-8 text-sm text-ink/60">
+          Support Tickets pipeline is not provisioned yet. Reinstall the app to
+          fix this.
+        </div>
       </div>
     )
   }
@@ -25,8 +37,10 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
   if (!pipeline) {
     return (
       <div>
-        <Header title="Tickets" plan={install.plan} />
-        <div className="p-8 text-sm text-ink/60">Pipeline {install.pipelineId} was not found in this account.</div>
+        <Header title="Tickets" plan={getFeaturePlan(install)} />
+        <div className="p-8 text-sm text-ink/60">
+          Pipeline {install.pipelineId} was not found in this account.
+        </div>
       </div>
     )
   }
@@ -35,17 +49,26 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
     listOpportunities(locationId, install.pipelineId),
     usersById(locationId),
   ])
-  const stages = pipeline.stages.slice().sort((a, b) => a.position - b.position).map((s) => ({ id: s.id, name: s.name }))
-  const tickets = opps.map((o) => mapOpportunityToTicket(o, stages, install.customFieldIds, userNames))
+  const stages = pipeline.stages
+    .slice()
+    .sort((a, b) => a.position - b.position)
+    .map((s) => ({ id: s.id, name: s.name }))
+  const tickets = opps.map((o) =>
+    mapOpportunityToTicket(o, stages, install.customFieldIds, userNames),
+  )
 
   return (
     <div>
       <Header
         title="Tickets"
         subtitle={`${tickets.length} total · pipeline ${pipeline.name}`}
-        plan={install.plan}
+        plan={getFeaturePlan(install)}
       />
-      <KanbanBoard locationId={locationId} stages={stages} initialTickets={tickets} />
+      <KanbanBoard
+        locationId={locationId}
+        stages={stages}
+        initialTickets={tickets}
+      />
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { getFeaturePlan } from '@/lib/entitlements'
 import {
   computeStats,
   weightedAvg,
@@ -26,10 +27,10 @@ export default async function ReportsPage({
   if (!locationId) return <NoLocation />
   const install = await getInstall(locationId)
   if (!install) return <NoInstall locationId={locationId} />
-  if (!isPaidTier(install.plan))
+  if (!isPaidTier(getFeaturePlan(install)))
     return (
       <div>
-        <Header title="Reports" plan={install.plan} />
+        <Header title="Reports" plan={getFeaturePlan(install)} />
         <PaidLock message="Response time, resolution and SLA reports are available on Pro and Enterprise." />
       </div>
     )
@@ -63,7 +64,7 @@ export default async function ReportsPage({
 
   return (
     <div>
-      <Header title="Reports" plan={install.plan} />
+      <Header title="Reports" plan={getFeaturePlan(install)} />
       <div className="p-8 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatTile
@@ -75,7 +76,7 @@ export default async function ReportsPage({
             label="SLA compliance"
             value={compliance == null ? '--' : `${Math.round(compliance)}%`}
             paidOnly
-            plan={install.plan}
+            plan={getFeaturePlan(install)}
           />
         </div>
 
@@ -83,7 +84,7 @@ export default async function ReportsPage({
           <LineChart data={merged14} />
         </Panel>
 
-        {isPaidTier(install.plan) ? (
+        {isPaidTier(getFeaturePlan(install)) ? (
           <Panel title="By department">
             <table className="w-full text-sm">
               <thead>

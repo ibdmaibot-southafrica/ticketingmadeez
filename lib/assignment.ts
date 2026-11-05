@@ -1,4 +1,10 @@
-import { getInstall, updateInstall, type AssignmentPolicy, type PlanTier } from './kv'
+import { getFeaturePlan } from '@/lib/entitlements'
+import {
+  getInstall,
+  updateInstall,
+  type AssignmentPolicy,
+  type PlanTier,
+} from './kv'
 import { ghlJson } from './ghl'
 import { listActiveUsers, type GhlUser } from './users'
 
@@ -34,15 +40,17 @@ export type AssignmentPoolStatus = {
   overCap: boolean // total > cap (soft: extras are silently excluded)
 }
 
-export async function getAssignmentPoolStatus(locationId: string): Promise<AssignmentPoolStatus | null> {
+export async function getAssignmentPoolStatus(
+  locationId: string,
+): Promise<AssignmentPoolStatus | null> {
   const install = await getInstall(locationId)
   if (!install) return null
   const policy = install.assignment ?? DEFAULT_POLICY
   const excluded = new Set(policy.excludeUserIds ?? [])
-  const users = (await listActiveUsers(locationId).catch(() => [] as GhlUser[])).filter(
-    (u) => !excluded.has(u.id),
-  )
-  const cap = poolCapForPlan(install.plan)
+  const users = (
+    await listActiveUsers(locationId).catch(() => [] as GhlUser[])
+  ).filter((u) => !excluded.has(u.id))
+  const cap = poolCapForPlan(getFeaturePlan(install))
   return {
     total: users.length,
     cap,
@@ -61,7 +69,9 @@ export async function getAssignmentPoolStatus(locationId: string): Promise<Assig
  * Returns null when auto-assign is disabled, the pool is empty, or we can't
  * reach the users API.
  */
-export async function pickNextAssignee(locationId: string): Promise<GhlUser | null> {
+export async function pickNextAssignee(
+  locationId: string,
+): Promise<GhlUser | null> {
   const install = await getInstall(locationId)
   if (!install) return null
   const policy = install.assignment ?? DEFAULT_POLICY
@@ -76,7 +86,7 @@ export async function pickNextAssignee(locationId: string): Promise<GhlUser | nu
 
   // Cap the rotating pool by tier. Extra users beyond the cap don't
   // participate in this rotation and won't receive auto-assigned tickets.
-  const cap = poolCapForPlan(install.plan)
+  const cap = poolCapForPlan(getFeaturePlan(install))
   const pool = filtered.slice(0, cap)
   if (pool.length === 0) return null
 
@@ -94,7 +104,11 @@ export async function pickNextAssignee(locationId: string): Promise<GhlUser | nu
  * Set assignedTo on an opportunity. Uses PUT /opportunities/{id} which is the
  * documented GHL endpoint for opportunity updates.
  */
-export async function assignOpportunity(locationId: string, opportunityId: string, userId: string): Promise<void> {
+export async function assignOpportunity(
+  locationId: string,
+  opportunityId: string,
+  userId: string,
+): Promise<void> {
   await ghlJson(`/opportunities/${encodeURIComponent(opportunityId)}`, {
     locationId,
     method: 'PUT',

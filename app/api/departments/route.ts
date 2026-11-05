@@ -1,3 +1,4 @@
+import { getFeaturePlan } from '@/lib/entitlements'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getInstall, isPaidTier } from '@/lib/kv'
@@ -16,13 +17,23 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const parsed = CreateSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid input', detail: parsed.error.flatten() }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid input', detail: parsed.error.flatten() },
+      { status: 400 },
+    )
   }
   const { locationId, name, pipelineId } = parsed.data
   const install = await getInstall(locationId)
-  if (!install) return NextResponse.json({ error: 'No install for this location' }, { status: 404 })
-  if (!isPaidTier(install.plan)) {
-    return NextResponse.json({ error: 'Adding departments is a Pro tier feature.' }, { status: 402 })
+  if (!install)
+    return NextResponse.json(
+      { error: 'No install for this location' },
+      { status: 404 },
+    )
+  if (!isPaidTier(getFeaturePlan(install))) {
+    return NextResponse.json(
+      { error: 'Adding departments is a Pro tier feature.' },
+      { status: 402 },
+    )
   }
   const departments = await upsertDepartment(locationId, {
     id: makeDepartmentId(name),

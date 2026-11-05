@@ -28,6 +28,7 @@ export type LocationInstall = {
   refreshToken: string
   expiresAt: number
   plan: PlanTier
+  includedPlan?: 'paid' | 'enterprise'
   installedAt: number
   pipelineId?: string
   customFieldIds?: {
@@ -69,6 +70,10 @@ CREATE TABLE IF NOT EXISTS tmez_installs (
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS tmez_service_entitlements (
+  location_id TEXT PRIMARY KEY,
+  plan TEXT NOT NULL CHECK (plan IN ('paid', 'enterprise'))
+);
 CREATE TABLE IF NOT EXISTS tmez_webhook_receipts (
   id TEXT PRIMARY KEY,
   completed BOOLEAN NOT NULL DEFAULT FALSE,
@@ -87,21 +92,26 @@ export async function getInstall(
   locationId: string,
 ): Promise<LocationInstall | null> {
   await ensureSchema()
-  const res = await getPool().query<{ data: LocationInstall }>(
-    'SELECT data FROM tmez_installs WHERE location_id = $1',
+  const res = await getPool().query<{
+    data: LocationInstall
+    service_plan?: 'paid' | 'enterprise'
+  }>(
+    'SELECT i.data, e.plan AS service_plan FROM tmez_installs i LEFT JOIN tmez_service_entitlements e ON e.location_id = i.location_id WHERE i.location_id = $1',
     [locationId],
   )
-  return res.rows[0]?.data ?? null
+  const row = res.rows[0]
+  return row ? { ...row.data, includedPlan: row.service_plan } : null
 }
 
 export async function saveInstall(install: LocationInstall): Promise<void> {
   await ensureSchema()
+  const { includedPlan: _includedPlan, ...storedInstall } = install
   await getPool().query(
     `INSERT INTO tmez_installs (location_id, data, updated_at)
      VALUES ($1, $2, NOW())
      ON CONFLICT (location_id) DO UPDATE
        SET data = EXCLUDED.data, updated_at = NOW()`,
-    [install.locationId, install],
+    [install.locationId, storedInstall],
   )
 }
 
@@ -110,7 +120,11 @@ export async function updateInstall(
   patch: Partial<LocationInstall>,
 ): Promise<LocationInstall | null> {
   await ensureSchema()
-  const { locationId: _ignored, ...safePatch } = patch
+  const {
+    locationId: _ignored,
+    includedPlan: _includedPlan,
+    ...safePatch
+  } = patch
   const res = await getPool().query<{ data: LocationInstall }>(
     'UPDATE tmez_installs SET data = data || $2::jsonb, updated_at = NOW() WHERE location_id = $1 RETURNING data',
     [locationId, JSON.stringify(safePatch)],
