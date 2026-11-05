@@ -1,6 +1,15 @@
+import { createHash } from 'node:crypto'
+import { verifyWebhook, planFromPayload } from '@/lib/security'
+import { env } from '@/lib/env'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { deleteInstall, getInstall, updateInstall, type PlanTier } from '@/lib/kv'
+import {
+  deleteInstall,
+  getInstall,
+  updateInstall,
+  claimWebhook,
+  finishWebhook,
+} from '@/lib/kv'
 import { provisionLocation, deprovisionLocation } from '@/lib/provisioning'
 import { autoAssignOpportunity } from '@/lib/assignment'
 
@@ -13,6 +22,7 @@ const eventSchema = z.object({
   companyId: z.string().optional(),
   appId: z.string().optional(),
   planId: z.string().optional(),
+  newPlanId: z.string().optional(),
   plan: z.string().optional(),
   status: z.string().optional(),
   // OpportunityCreate / OpportunityUpdate payloads: GHL sends the full opp
@@ -24,20 +34,18 @@ const eventSchema = z.object({
   assignedTo: z.string().nullable().optional(),
 })
 
-function planFromPayload(p: { planId?: string; plan?: string; status?: string }): PlanTier {
-  const raw = (p.plan ?? p.planId ?? '').toString().toLowerCase()
-  if (p.status && ['cancelled', 'canceled', 'expired', 'inactive'].includes(p.status.toLowerCase())) return 'free'
-  if (raw.includes('enterprise') || raw.includes('business')) return 'enterprise'
-  if (raw.includes('paid') || raw.includes('pro') || raw.includes('premium')) return 'paid'
-  return 'free'
-}
-
 export async function POST(req: NextRequest) {
+  const raw = await req.text()
+  if (!verifyWebhook(raw, req.headers.get('x-ghl-signature')))
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   let body: unknown
   try {
-    body = await req.json()
+    body = JSON.parse(raw)
   } catch {
-    return NextResponse.json({ ok: false, error: 'invalid_json' }, { status: 400 })
+    return NextResponse.json(
+      { ok: false, error: 'invalid_json' },
+      { status: 400 },
+    )
   }
 
   const parsed = eventSchema.safeParse(body)
@@ -47,8 +55,43 @@ export async function POST(req: NextRequest) {
   }
 
   const evt = parsed.data
+  if (evt.appId && evt.appId !== env.GHL_APP_ID)
+    return NextResponse.json({ error: 'Wrong app' }, { status: 403 })
   const type = evt.type.toUpperCase()
+  if (
+    [
+      'INSTALL',
+      'UNINSTALL',
+      'PLAN_CHANGE',
+      'PLAN_UPDATED',
+      'PLAN.UPDATED',
+      'PLANUPDATED',
+      'SUBSCRIPTION.UPDATED',
+      'APP.INSTALLED',
+      'APPINSTALL',
+      'APP.UNINSTALLED',
+      'APPUNINSTALL',
+    ].includes(type) &&
+    evt.appId !== env.GHL_APP_ID
+  )
+    return NextResponse.json({ error: 'Wrong app' }, { status: 403 })
+  const receipt = createHash('sha256').update(raw).digest('hex')
+  const claim = await claimWebhook(receipt)
+  if (claim === 'completed')
+    return NextResponse.json({ ok: true, duplicate: true })
+  if (claim === 'busy')
+    return NextResponse.json({ error: 'Event processing' }, { status: 503 })
+  let succeeded = false
+  try {
+    const response = await handleEvent(evt, type)
+    succeeded = response.status >= 200 && response.status < 300
+    return response
+  } finally {
+    await finishWebhook(receipt, succeeded)
+  }
+}
 
+async function handleEvent(evt: z.infer<typeof eventSchema>, type: string) {
   try {
     switch (type) {
       case 'INSTALL':
@@ -56,10 +99,22 @@ export async function POST(req: NextRequest) {
       case 'APPINSTALL': {
         if (evt.locationId) {
           const existing = await getInstall(evt.locationId)
-          if (existing && !existing.pipelineId) {
-            await provisionLocation(evt.locationId).catch((e) =>
-              console.error('[webhook install] provision failed', e),
+          if (!existing)
+            return NextResponse.json(
+              { error: 'Install not ready' },
+              { status: 503 },
             )
+          if (evt.planId) {
+            const plan = planFromPayload(evt)
+            if (!plan)
+              return NextResponse.json(
+                { error: 'Unknown plan ID' },
+                { status: 422 },
+              )
+            await updateInstall(evt.locationId, { plan })
+          }
+          if (existing && !existing.pipelineId) {
+            await provisionLocation(evt.locationId)
           }
         }
         break
@@ -73,13 +128,26 @@ export async function POST(req: NextRequest) {
         }
         break
       }
+      case 'PLAN_CHANGE':
       case 'PLAN_UPDATED':
       case 'PLAN.UPDATED':
       case 'PLANUPDATED':
       case 'SUBSCRIPTION.UPDATED': {
         if (evt.locationId) {
-          const plan = planFromPayload(evt)
-          await updateInstall(evt.locationId, { plan })
+          const plan = planFromPayload({
+            ...evt,
+            planId: evt.newPlanId ?? evt.planId,
+          })
+          if (!plan)
+            return NextResponse.json(
+              { error: 'Unknown plan ID' },
+              { status: 422 },
+            )
+          if (!(await updateInstall(evt.locationId, { plan })))
+            return NextResponse.json(
+              { error: 'Install not ready' },
+              { status: 503 },
+            )
         }
         break
       }
@@ -99,7 +167,9 @@ export async function POST(req: NextRequest) {
             console.error('[webhook opportunity create] auto-assign failed', e)
             return { skipped: 'error' as const }
           })
-          console.log(`[webhook opportunity create] opp=${opportunityId} result=${JSON.stringify(result)}`)
+          console.log(
+            `[webhook opportunity create] opp=${opportunityId} result=${JSON.stringify(result)}`,
+          )
         }
         break
       }

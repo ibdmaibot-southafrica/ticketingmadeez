@@ -6,9 +6,9 @@ Internal build for NexBDM. Delivered as a GHL Marketplace App.
 
 ## Stack
 
-- Next.js 15 App Router, TypeScript, Tailwind
-- Upstash Redis for token + per-location state
-- Deploys to Vercel (subdomain `ticketing.nexbdm.co.za`)
+- Next.js 16 App Router, TypeScript, Tailwind
+- PostgreSQL for token, per-location state and webhook receipts
+- Deploys to Coolify (subdomain `ticketing.nexbdm.co.za`)
 - No custom database, no admin dashboard hosted separately from the settings iframe
 
 ## Repo layout
@@ -81,3 +81,15 @@ Paid ($15/mo, gated via GHL Marketplace billing):
 - Reporting: response time, resolution rate, SLA compliance
 
 Feature gating is driven by the `plan` field on the per-location install record in KV, which is set on install (defaults to `free`) and updated by the `PLAN_UPDATED` webhook.
+
+## Security and billing repair, 2026-11-05
+
+Settings and mutation endpoints require a short-lived account-bound session obtained by decrypting the encrypted CRM user context on the server. Configure `GHL_APP_SHARED_SECRET` from Manage > Secrets and a random `SESSION_SECRET` of at least 32 characters before deployment. Launch the app inside the CRM iframe. Public direct settings links require CRM sign-in.
+
+Webhooks require HighLevel's Ed25519 `X-GHL-Signature`. App lifecycle events must match `GHL_APP_ID`. `INSTALL` uses `planId`; `PLAN_CHANGE` uses `newPlanId`. Unknown plans are rejected rather than granting access. Receipt hashes prevent repeated successful deliveries from changing state again. Failed processing stays retryable. Installation row patches merge atomically in PostgreSQL.
+
+Pro and Enterprise reports are gated on the server. Response and resolution metrics require measured timestamps. Last-edit timestamps are never substituted. Historical records without measurements show unavailable values.
+
+Validation: `npm run build`, then `npm test`. HTTP security tests run the built server on port 3812 using synthetic sessions and do not modify customer data.
+
+Deployment prerequisite: the public webhook URL must accept automated requests. Cloudflare Free Bot Fight Mode was enabled during the audit and a public request received a challenge. A WAF skip rule cannot bypass that product. Resolve the app's edge routing before claiming billing delivery is verified.

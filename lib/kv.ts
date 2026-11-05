@@ -69,6 +69,11 @@ CREATE TABLE IF NOT EXISTS tmez_installs (
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS tmez_webhook_receipts (
+  id TEXT PRIMARY KEY,
+  completed BOOLEAN NOT NULL DEFAULT FALSE,
+  claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 `
 
 let migrated = false
@@ -78,7 +83,9 @@ async function ensureSchema(): Promise<void> {
   migrated = true
 }
 
-export async function getInstall(locationId: string): Promise<LocationInstall | null> {
+export async function getInstall(
+  locationId: string,
+): Promise<LocationInstall | null> {
   await ensureSchema()
   const res = await getPool().query<{ data: LocationInstall }>(
     'SELECT data FROM tmez_installs WHERE location_id = $1',
@@ -102,14 +109,50 @@ export async function updateInstall(
   locationId: string,
   patch: Partial<LocationInstall>,
 ): Promise<LocationInstall | null> {
-  const existing = await getInstall(locationId)
-  if (!existing) return null
-  const updated = { ...existing, ...patch }
-  await saveInstall(updated)
-  return updated
+  await ensureSchema()
+  const { locationId: _ignored, ...safePatch } = patch
+  const res = await getPool().query<{ data: LocationInstall }>(
+    'UPDATE tmez_installs SET data = data || $2::jsonb, updated_at = NOW() WHERE location_id = $1 RETURNING data',
+    [locationId, JSON.stringify(safePatch)],
+  )
+  return res.rows[0]?.data ?? null
 }
 
 export async function deleteInstall(locationId: string): Promise<void> {
   await ensureSchema()
-  await getPool().query('DELETE FROM tmez_installs WHERE location_id = $1', [locationId])
+  await getPool().query('DELETE FROM tmez_installs WHERE location_id = $1', [
+    locationId,
+  ])
+}
+
+// Store only a body hash. A failed handler releases its claim so delivery can retry.
+export async function claimWebhook(
+  id: string,
+): Promise<'claimed' | 'completed' | 'busy'> {
+  await ensureSchema()
+  const result = await getPool().query(
+    `INSERT INTO tmez_webhook_receipts (id) VALUES ($1)
+     ON CONFLICT (id) DO UPDATE SET claimed_at = NOW()
+     WHERE NOT tmez_webhook_receipts.completed AND tmez_webhook_receipts.claimed_at < NOW() - INTERVAL '5 minutes'
+     RETURNING id`,
+    [id],
+  )
+  if (result.rowCount) return 'claimed'
+  const existing = await getPool().query<{ completed: boolean }>(
+    'SELECT completed FROM tmez_webhook_receipts WHERE id = $1',
+    [id],
+  )
+  return existing.rows[0]?.completed ? 'completed' : 'busy'
+}
+export async function finishWebhook(id: string, success: boolean) {
+  if (success)
+    await getPool().query(
+      'UPDATE tmez_webhook_receipts SET completed = TRUE WHERE id = $1',
+      [id],
+    )
+  else
+    await getPool().query(
+      'DELETE FROM tmez_webhook_receipts WHERE id = $1 AND NOT completed',
+      [id],
+    )
 }

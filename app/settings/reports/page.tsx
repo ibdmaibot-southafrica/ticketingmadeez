@@ -1,28 +1,38 @@
+import {
+  computeStats,
+  weightedAvg,
+  mergeDaily,
+  type DeptStats,
+} from '@/lib/reporting'
 import { getInstall, isPaidTier } from '@/lib/kv'
 import { readDepartments } from '@/lib/departments'
-import { getPipeline, listOpportunities, mapOpportunityToTicket, type Ticket } from '@/lib/ghl-data'
+import {
+  getPipeline,
+  listOpportunities,
+  mapOpportunityToTicket,
+  type Ticket,
+} from '@/lib/ghl-data'
 import { Header, PaidLock } from '../_components/Header'
 import { NoLocation, NoInstall } from '../_components/NoLocation'
 
 export const dynamic = 'force-dynamic'
 
-type DeptStats = {
-  deptName: string
-  total: number
-  open: number
-  resolved: number
-  avgResponseMin: number | null
-  slaCompliancePct: number | null
-  volume14: number[]
-}
-
-const RESOLVED_STAGE_NAMES = new Set(['resolved', 'closed'])
-
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ locationId?: string }> }) {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ locationId?: string }>
+}) {
   const { locationId } = await searchParams
   if (!locationId) return <NoLocation />
   const install = await getInstall(locationId)
   if (!install) return <NoInstall locationId={locationId} />
+  if (!isPaidTier(install.plan))
+    return (
+      <div>
+        <Header title="Reports" plan={install.plan} />
+        <PaidLock message="Response time, resolution and SLA reports are available on Pro and Enterprise." />
+      </div>
+    )
   const data = await readDepartments(locationId)
   if (!data) return <NoInstall locationId={locationId} />
   const { departments } = data
@@ -32,16 +42,23 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     const pipeline = await getPipeline(locationId, dept.pipelineId)
     if (!pipeline) continue
     const opps = await listOpportunities(locationId, dept.pipelineId)
-    const tickets = opps.map((o) => mapOpportunityToTicket(o, pipeline.stages, install.customFieldIds))
+    const tickets = opps.map((o) =>
+      mapOpportunityToTicket(o, pipeline.stages, install.customFieldIds),
+    )
     perDept.push(computeStats(dept.name, tickets, dept.sla))
   }
 
   const totalTickets = perDept.reduce((s, d) => s + d.total, 0)
   const totalOpen = perDept.reduce((s, d) => s + d.open, 0)
   const totalResolved = perDept.reduce((s, d) => s + d.resolved, 0)
-  const resolutionRate = totalTickets > 0 ? Math.round((totalResolved / totalTickets) * 100) : 0
-  const avgResp = weightedAvg(perDept.map((d) => [d.avgResponseMin, d.total]))
-  const compliance = weightedAvg(perDept.map((d) => [d.slaCompliancePct, d.total]))
+  const resolutionRate =
+    totalTickets > 0 ? Math.round((totalResolved / totalTickets) * 100) : 0
+  const avgResp = weightedAvg(
+    perDept.map((d) => [d.avgResponseMin, d.responseSamples]),
+  )
+  const compliance = weightedAvg(
+    perDept.map((d) => [d.slaCompliancePct, d.resolutionSamples]),
+  )
   const merged14 = mergeDaily(perDept.map((d) => d.volume14))
 
   return (
@@ -49,9 +66,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <Header title="Reports" plan={install.plan} />
       <div className="p-8 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatTile label="Avg response time" value={avgResp == null ? '--' : formatMinutes(avgResp)} />
+          <StatTile
+            label="Avg response time"
+            value={avgResp == null ? '--' : formatMinutes(avgResp)}
+          />
           <StatTile label="Resolution rate" value={`${resolutionRate}%`} />
-          <StatTile label="SLA compliance" value={compliance == null ? '--' : `${Math.round(compliance)}%`} paidOnly plan={install.plan} />
+          <StatTile
+            label="SLA compliance"
+            value={compliance == null ? '--' : `${Math.round(compliance)}%`}
+            paidOnly
+            plan={install.plan}
+          />
         </div>
 
         <Panel title="Ticket volume (last 14 days)">
@@ -67,7 +92,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   <th className="text-right py-2 font-semibold">Total</th>
                   <th className="text-right py-2 font-semibold">Open</th>
                   <th className="text-right py-2 font-semibold">Resolved</th>
-                  <th className="text-right py-2 font-semibold">Avg response</th>
+                  <th className="text-right py-2 font-semibold">
+                    Avg response
+                  </th>
                   <th className="text-right py-2 font-semibold">SLA</th>
                 </tr>
               </thead>
@@ -78,8 +105,16 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                     <td className="py-2 text-right">{d.total}</td>
                     <td className="py-2 text-right">{d.open}</td>
                     <td className="py-2 text-right">{d.resolved}</td>
-                    <td className="py-2 text-right">{d.avgResponseMin == null ? '--' : formatMinutes(d.avgResponseMin)}</td>
-                    <td className="py-2 text-right">{d.slaCompliancePct == null ? '--' : `${d.slaCompliancePct}%`}</td>
+                    <td className="py-2 text-right">
+                      {d.avgResponseMin == null
+                        ? '--'
+                        : formatMinutes(d.avgResponseMin)}
+                    </td>
+                    <td className="py-2 text-right">
+                      {d.slaCompliancePct == null
+                        ? '--'
+                        : `${d.slaCompliancePct}%`}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -93,18 +128,45 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   )
 }
 
-function StatTile({ label, value, paidOnly, plan }: { label: string; value: string; paidOnly?: boolean; plan?: string }) {
+function StatTile({
+  label,
+  value,
+  paidOnly,
+  plan,
+}: {
+  label: string
+  value: string
+  paidOnly?: boolean
+  plan?: string
+}) {
   const locked = paidOnly && plan !== 'paid' && plan !== 'enterprise'
   return (
     <div className="rounded-2xl border border-ink/10 bg-white p-5 relative">
-      <div className="text-xs text-ink/50 uppercase tracking-wider">{label}</div>
-      <div className={'mt-1 text-3xl font-heading font-bold ' + (locked ? 'text-ink/30' : '')}>{locked ? '--' : value}</div>
-      {locked ? <div className="mt-1 text-[10px] text-emerald font-semibold">Pro</div> : null}
+      <div className="text-xs text-ink/50 uppercase tracking-wider">
+        {label}
+      </div>
+      <div
+        className={
+          'mt-1 text-3xl font-heading font-bold ' +
+          (locked ? 'text-ink/30' : '')
+        }
+      >
+        {locked ? '--' : value}
+      </div>
+      {locked ? (
+        <div className="mt-1 text-[10px] text-emerald font-semibold">Pro</div>
+      ) : null}
     </div>
   )
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+function Panel({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
   return (
     <div className="rounded-2xl border border-ink/10 bg-white p-5">
       <div className="text-sm font-heading font-bold mb-3">{title}</div>
@@ -137,50 +199,6 @@ function LineChart({ data }: { data: number[] }) {
       })}
     </svg>
   )
-}
-
-function computeStats(deptName: string, tickets: Ticket[], sla?: { firstResponseMinutes: number; resolutionMinutes: number; active: boolean }): DeptStats {
-  const total = tickets.length
-  const isResolved = (t: Ticket) => t.stageName && RESOLVED_STAGE_NAMES.has(t.stageName.toLowerCase())
-  const resolved = tickets.filter(isResolved).length
-  const open = total - resolved
-
-  const responseMinutes: number[] = tickets
-    .filter(isResolved)
-    .map((t) => Math.max(0, (t.updatedAt.getTime() - t.createdAt.getTime()) / 60000))
-  const avgResponseMin = responseMinutes.length > 0 ? Math.round(responseMinutes.reduce((s, v) => s + v, 0) / responseMinutes.length) : null
-
-  let slaCompliancePct: number | null = null
-  if (sla?.active && total > 0) {
-    const withinTarget = tickets.filter((t) => {
-      const mins = (t.updatedAt.getTime() - t.createdAt.getTime()) / 60000
-      return mins <= sla.resolutionMinutes
-    }).length
-    slaCompliancePct = Math.round((withinTarget / total) * 100)
-  }
-
-  const volume14 = new Array(14).fill(0)
-  const cutoff = Date.now() - 14 * 24 * 3600 * 1000
-  for (const t of tickets) {
-    const dayIdx = 13 - Math.floor((Date.now() - t.createdAt.getTime()) / (24 * 3600 * 1000))
-    if (t.createdAt.getTime() >= cutoff && dayIdx >= 0 && dayIdx < 14) volume14[dayIdx] += 1
-  }
-
-  return { deptName, total, open, resolved, avgResponseMin, slaCompliancePct, volume14 }
-}
-
-function weightedAvg(entries: Array<[number | null, number]>): number | null {
-  const filtered = entries.filter(([v]) => v != null) as Array<[number, number]>
-  const w = filtered.reduce((s, [, wt]) => s + wt, 0)
-  if (w === 0) return null
-  return filtered.reduce((s, [v, wt]) => s + v * wt, 0) / w
-}
-
-function mergeDaily(perDept: number[][]): number[] {
-  if (perDept.length === 0) return new Array(14).fill(0)
-  const merged = new Array(14).fill(0)
-  for (const d of perDept) for (let i = 0; i < 14; i++) merged[i] += d[i] || 0
-  return merged
 }
 
 function formatMinutes(m: number): string {

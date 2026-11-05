@@ -6,8 +6,9 @@
     "dev": "next dev -p 3810",
     "build": "next build",
     "start": "next start -p 3810",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.cjs"
   },
   "dependencies": {
     "next": "^16.2.10",
