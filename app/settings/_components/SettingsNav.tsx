@@ -8,6 +8,8 @@ const NAV = [
   { href: '/settings/departments', label: 'Departments' },
   { href: '/settings/sla', label: 'SLA policies' },
   { href: '/settings/reports', label: 'Reports' },
+  { href: '/settings/knowledge', label: 'Knowledge base' },
+  { href: '/settings/projects', label: 'Projects and time' },
   { href: '/settings/config', label: 'Settings' },
 ]
 
@@ -19,7 +21,8 @@ export function SettingsNav() {
   return (
     <nav className="flex flex-col gap-1 p-3">
       {NAV.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(item.href + '/')
+        const active =
+          pathname === item.href || pathname.startsWith(item.href + '/')
         return (
           <Link
             key={item.href}

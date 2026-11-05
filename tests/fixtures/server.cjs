@@ -9,6 +9,17 @@ if (process.env.FIXTURE_WEBHOOK_PUBLIC_KEY) {
 const receipts = new Map()
 // Loaded only by isolated HTTP tests. No database or provider traffic leaves this process.
 const pg = require('pg')
+const { PGlite } = require('@electric-sql/pglite')
+let workspaceDb
+async function workspaceQuery(sql, args = []) {
+  workspaceDb ||= new PGlite()
+  if (sql.includes('CREATE TABLE')) {
+    await workspaceDb.exec(sql)
+    return { rows: [], rowCount: 0 }
+  }
+  const result = await workspaceDb.query(sql, args)
+  return { ...result, rowCount: result.affectedRows || result.rows.length }
+}
 const install = {
   locationId: 'tenant-a',
   companyId: 'test-company',
@@ -19,9 +30,21 @@ const install = {
   plan: process.env.FIXTURE_PLAN || 'free',
   installedAt: Date.now(),
   pipelineId: 'fixture-pipeline',
+  customFieldIds: { priority: 'fixture-priority' },
 }
 pg.Pool = class {
+  async connect() {
+    return { query: workspaceQuery, release() {} }
+  }
   async query(sql, args = []) {
+    if (
+      sql.includes('tmez_ticket_') ||
+      sql.includes('tmez_hub_') ||
+      sql.includes('tmez_time_') ||
+      sql.includes('tmez_portal_') ||
+      sql.includes('tmez_ai_')
+    )
+      return workspaceQuery(sql, args)
     if (sql.includes('CREATE TABLE')) return { rows: [], rowCount: 0 }
     if (sql.includes('INSERT INTO tmez_webhook_receipts')) {
       if (receipts.has(args[0])) return { rows: [], rowCount: 0 }
@@ -101,8 +124,31 @@ global.fetch = async (input, options) => {
     body = {
       users: [{ id: 'test-user', name: 'Isolated test user', isActive: true }],
     }
-  else if (url.pathname === '/opportunities/fixture-ticket')
+  else if (url.pathname === '/opportunities/fixture-ticket') {
+    if (options?.method === 'PUT') {
+      const patch = JSON.parse(options.body)
+      if (patch.assignedTo === 'outside-user')
+        throw new Error('Invalid assignment reached provider')
+      if (patch.customFields)
+        patch.customFields = patch.customFields.map((f) => ({
+          id: f.id,
+          fieldValue: f.field_value,
+        }))
+      Object.assign(ticket, patch)
+    }
     body = { opportunity: ticket }
+  } else if (url.pathname === '/opportunities/foreign-ticket')
+    body = {
+      opportunity: { ...ticket, id: 'foreign-ticket', locationId: 'tenant-b' },
+    }
+  else if (url.pathname === '/opportunities/sales-ticket')
+    body = {
+      opportunity: {
+        ...ticket,
+        id: 'sales-ticket',
+        pipelineId: 'sales-pipeline',
+      },
+    }
   else
     throw new Error('Unexpected isolated provider operation: ' + url.pathname)
   return Response.json(body)

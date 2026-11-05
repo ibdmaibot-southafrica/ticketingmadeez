@@ -15,6 +15,7 @@ import {
 } from '@/lib/ghl-data'
 import { Header, PaidLock } from '../_components/Header'
 import { NoLocation, NoInstall } from '../_components/NoLocation'
+import { getTicketDetails } from '@/lib/workspace-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,9 +44,27 @@ export default async function ReportsPage({
     const pipeline = await getPipeline(locationId, dept.pipelineId)
     if (!pipeline) continue
     const opps = await listOpportunities(locationId, dept.pipelineId)
-    const tickets = opps.map((o) =>
-      mapOpportunityToTicket(o, pipeline.stages, install.customFieldIds),
+    const details = await getTicketDetails(
+      locationId,
+      opps.map((o) => o.id),
     )
+    const tickets = opps.map((o) => {
+      const t = mapOpportunityToTicket(
+        o,
+        pipeline.stages,
+        install.customFieldIds,
+      )
+      const measured = details.get(o.id)
+      return {
+        ...t,
+        firstResponseAt: measured?.firstResponseAt
+          ? new Date(measured.firstResponseAt)
+          : undefined,
+        resolvedAt: measured?.resolvedAt
+          ? new Date(measured.resolvedAt)
+          : undefined,
+      }
+    })
     perDept.push(computeStats(dept.name, tickets, dept.sla))
   }
 
@@ -66,6 +85,11 @@ export default async function ReportsPage({
     <div>
       <Header title="Reports" plan={getFeaturePlan(install)} />
       <div className="p-8 space-y-6">
+        <p className="text-xs text-ink/60">
+          Response and SLA figures use confirmations and stage changes recorded
+          in TicketingMadeEZ. Historical ticket edits and internal notes do not
+          count as customer responses.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatTile
             label="Avg response time"

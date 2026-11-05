@@ -52,5 +52,6 @@ export const config = {
     '/settings/:path*',
     '/api/tickets/:path*',
     '/api/departments/:path*',
+    '/api/workspace/:path*',
   ],
 }

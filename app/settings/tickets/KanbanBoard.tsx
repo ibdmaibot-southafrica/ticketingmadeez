@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Ticket } from '@/lib/ghl-data'
+import { TicketWorkspace } from './TicketWorkspace'
+import { ticketSla, type SlaPolicy } from '@/lib/ticket-sla'
 
 type Stage = { id: string; name: string }
 
@@ -10,10 +12,16 @@ export function KanbanBoard({
   locationId,
   stages,
   initialTickets,
+  departments,
+  departmentId,
+  sla,
 }: {
   locationId: string
   stages: Stage[]
   initialTickets: Ticket[]
+  departments: { id: string; name: string }[]
+  departmentId?: string
+  sla?: SlaPolicy
 }) {
   const router = useRouter()
   const [tickets, setTickets] = useState<Ticket[]>(initialTickets)
@@ -22,22 +30,65 @@ export function KanbanBoard({
   const [hoverStageId, setHoverStageId] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [assignee, setAssignee] = useState('all')
+  const [priority, setPriority] = useState('all')
+  const [breachedOnly, setBreachedOnly] = useState(false)
+  useEffect(() => setTickets(initialTickets), [initialTickets])
+  const filtered = tickets.filter((t) => {
+    const query = search.trim().toLowerCase()
+    return (
+      (!query ||
+        [t.subject, t.contactName, t.id, t.description].some((v) =>
+          v?.toLowerCase().includes(query),
+        )) &&
+      (assignee === 'all' ||
+        (assignee === 'unassigned'
+          ? !t.assignedUserId
+          : t.assignedUserId === assignee)) &&
+      (priority === 'all' ||
+        t.priority?.toLowerCase() === priority.toLowerCase()) &&
+      (!breachedOnly || ticketSla({ ...t, sla }).breached)
+    )
+  })
+  const assignees = Array.from(
+    new Map(
+      tickets
+        .filter((t) => t.assignedUserId)
+        .map((t) => [
+          t.assignedUserId!,
+          t.assignedUserName || t.assignedUserId!,
+        ]),
+    ).entries(),
+  )
 
   const byStage = new Map<string, Ticket[]>()
   for (const s of stages) byStage.set(s.id, [])
-  for (const t of tickets) byStage.get(t.stageId)?.push(t)
+  for (const t of filtered) byStage.get(t.stageId)?.push(t)
 
   async function moveTo(ticketId: string, toStageId: string) {
     const t = tickets.find((x) => x.id === ticketId)
     if (!t || t.stageId === toStageId) return
     const fromStageId = t.stageId
     // Optimistic
-    setTickets((cur) => cur.map((x) => (x.id === ticketId ? { ...x, stageId: toStageId, stageName: stages.find((s) => s.id === toStageId)?.name } : x)))
+    setTickets((cur) =>
+      cur.map((x) =>
+        x.id === ticketId
+          ? {
+              ...x,
+              stageId: toStageId,
+              stageName: stages.find((s) => s.id === toStageId)?.name,
+            }
+          : x,
+      ),
+    )
     setSavingIds((cur) => new Set(cur).add(ticketId))
     setErr(null)
     try {
       const status = (() => {
-        const name = stages.find((s) => s.id === toStageId)?.name?.toLowerCase() ?? ''
+        const name =
+          stages.find((s) => s.id === toStageId)?.name?.toLowerCase() ?? ''
         if (name === 'resolved') return 'won'
         if (name === 'closed') return 'lost'
         return 'open'
@@ -54,7 +105,17 @@ export function KanbanBoard({
       startTransition(() => router.refresh())
     } catch (e) {
       // Revert
-      setTickets((cur) => cur.map((x) => (x.id === ticketId ? { ...x, stageId: fromStageId, stageName: stages.find((s) => s.id === fromStageId)?.name } : x)))
+      setTickets((cur) =>
+        cur.map((x) =>
+          x.id === ticketId
+            ? {
+                ...x,
+                stageId: fromStageId,
+                stageName: stages.find((s) => s.id === fromStageId)?.name,
+              }
+            : x,
+        ),
+      )
       setErr(`Move failed: ${(e as Error).message}`)
     } finally {
       setSavingIds((cur) => {
@@ -67,8 +128,89 @@ export function KanbanBoard({
 
   return (
     <div className="p-6">
-      {err ? <div className="mb-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2">{err}</div> : null}
-      <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))` }}>
+      <div className="mb-5 flex flex-wrap items-end gap-3 text-xs">
+        <label className="flex min-w-44 flex-1 flex-col gap-1">
+          Search tickets
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Subject, contact or ticket ID"
+            className="rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          Department
+          <select
+            value={departmentId || ''}
+            className="rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm"
+            onChange={(e) =>
+              router.push(
+                `/settings/tickets?locationId=${encodeURIComponent(locationId)}&department=${encodeURIComponent(e.target.value)}`,
+              )
+            }
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          Assignment
+          <select
+            value={assignee}
+            onChange={(e) => setAssignee(e.target.value)}
+            className="rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm"
+          >
+            <option value="all">Everyone</option>
+            <option value="unassigned">Unassigned</option>
+            {assignees.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          Priority
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className="rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm"
+          >
+            <option value="all">All priorities</option>
+            {['Low', 'Normal', 'High', 'Urgent'].map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </label>
+        {sla?.active && (
+          <label className="flex items-center gap-2 py-2">
+            <input
+              type="checkbox"
+              checked={breachedOnly}
+              onChange={(e) => setBreachedOnly(e.target.checked)}
+            />
+            SLA breached
+          </label>
+        )}
+        <span className="py-2 text-ink/50">
+          {filtered.length} of {tickets.length}
+        </span>
+      </div>
+      {err ? (
+        <div className="mb-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2">
+          {err}
+        </div>
+      ) : null}
+      <div
+        className="grid gap-4 overflow-x-auto pb-4"
+        style={{
+          gridTemplateColumns: `repeat(${stages.length}, minmax(210px, 1fr))`,
+        }}
+      >
         {stages.map((stage) => {
           const list = byStage.get(stage.id) ?? []
           const isHover = hoverStageId === stage.id && draggingId
@@ -87,14 +229,17 @@ export function KanbanBoard({
               }}
               onDrop={(e) => {
                 e.preventDefault()
-                const id = e.dataTransfer.getData('text/ticket-id') || draggingId
+                const id =
+                  e.dataTransfer.getData('text/ticket-id') || draggingId
                 setHoverStageId(null)
                 setDraggingId(null)
                 if (id) moveTo(id, stage.id)
               }}
             >
               <div className="flex items-center justify-between px-1 mb-2">
-                <h2 className="text-sm font-heading font-bold uppercase tracking-wider text-ink/70">{stage.name}</h2>
+                <h2 className="text-sm font-heading font-bold uppercase tracking-wider text-ink/70">
+                  {stage.name}
+                </h2>
                 <span className="text-xs text-ink/40">{list.length}</span>
               </div>
               <div
@@ -105,13 +250,17 @@ export function KanbanBoard({
                 style={{ minHeight: 80 }}
               >
                 {list.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-ink/10 p-4 text-xs text-ink/40 text-center">Drop here</div>
+                  <div className="rounded-lg border border-dashed border-ink/10 p-4 text-xs text-ink/40 text-center">
+                    Drop here
+                  </div>
                 ) : (
                   list.map((t) => (
                     <TicketCard
                       key={t.id}
                       t={t}
                       saving={savingIds.has(t.id)}
+                      onOpen={() => setSelectedId(t.id)}
+                      sla={sla}
                       onDragStart={(e) => {
                         e.dataTransfer.effectAllowed = 'move'
                         e.dataTransfer.setData('text/ticket-id', t.id)
@@ -129,6 +278,15 @@ export function KanbanBoard({
           )
         })}
       </div>
+      {selectedId && (
+        <TicketWorkspace
+          key={selectedId}
+          locationId={locationId}
+          ticketId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onUpdated={() => startTransition(() => router.refresh())}
+        />
+      )}
     </div>
   )
 }
@@ -138,11 +296,15 @@ function TicketCard({
   saving,
   onDragStart,
   onDragEnd,
+  onOpen,
+  sla,
 }: {
   t: Ticket
   saving: boolean
   onDragStart: (e: React.DragEvent) => void
   onDragEnd: () => void
+  onOpen: () => void
+  sla?: SlaPolicy
 }) {
   return (
     <div
@@ -159,13 +321,42 @@ function TicketCard({
           {(t.contactName ?? t.subject).slice(0, 1).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-ink truncate">{t.subject || 'Untitled ticket'}</div>
-          {t.contactName ? <div className="text-[11px] text-ink/50 truncate">{t.contactName}</div> : null}
+          <button
+            type="button"
+            onClick={onOpen}
+            className="block max-w-full truncate text-left text-sm font-semibold text-ink hover:underline"
+          >
+            {t.subject || 'Untitled ticket'}
+          </button>
+          {t.contactName ? (
+            <div className="text-[11px] text-ink/50 truncate">
+              {t.contactName}
+            </div>
+          ) : null}
         </div>
       </div>
+      {sla?.active && (
+        <p
+          className={
+            'mt-2 text-[10px] ' +
+            (ticketSla({ ...t, sla }).breached
+              ? 'font-semibold text-red-700'
+              : 'text-ink/50')
+          }
+        >
+          {ticketSla({ ...t, sla }).label}
+        </p>
+      )}
+      {t.dueAt && (
+        <p className="mt-1 text-[10px] text-ink/50">
+          Due {new Date(t.dueAt).toLocaleString()}
+        </p>
+      )}
       <div className="mt-2 flex items-center gap-2 flex-wrap">
         {t.priority ? <PriorityChip value={t.priority} /> : null}
-        {t.source ? <span className="text-[10px] text-ink/50">{t.source}</span> : null}
+        {t.source ? (
+          <span className="text-[10px] text-ink/50">{t.source}</span>
+        ) : null}
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-ink/40">
         <span>{formatWhen(t.updatedAt)}</span>
@@ -190,11 +381,17 @@ function PriorityChip({ value }: { value: string }) {
     v === 'urgent'
       ? 'bg-red-100 text-red-700'
       : v === 'high'
-      ? 'bg-orange-100 text-orange-700'
-      : v === 'low'
-      ? 'bg-slate-100 text-slate-600'
-      : 'bg-cyan/15 text-cyan'
-  return <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${cls}`}>{value}</span>
+        ? 'bg-orange-100 text-orange-700'
+        : v === 'low'
+          ? 'bg-slate-100 text-slate-600'
+          : 'bg-cyan/15 text-cyan'
+  return (
+    <span
+      className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${cls}`}
+    >
+      {value}
+    </span>
+  )
 }
 
 function formatWhen(d: Date | string): string {

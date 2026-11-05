@@ -1,5 +1,7 @@
 import { getFeaturePlan } from '@/lib/entitlements'
-import { getInstall } from '@/lib/kv'
+import { getInstall, isPaidTier } from '@/lib/kv'
+import { ensureDefaultDepartments } from '@/lib/departments'
+import { getTicketDetails } from '@/lib/workspace-store'
 import {
   getPipeline,
   listOpportunities,
@@ -15,9 +17,9 @@ export const dynamic = 'force-dynamic'
 export default async function TicketsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ locationId?: string }>
+  searchParams: Promise<{ locationId?: string; department?: string }>
 }) {
-  const { locationId } = await searchParams
+  const { locationId, department } = await searchParams
   if (!locationId) return <NoLocation />
   const install = await getInstall(locationId)
   if (!install) return <NoInstall locationId={locationId} />
@@ -33,7 +35,13 @@ export default async function TicketsPage({
     )
   }
 
-  const pipeline = await getPipeline(locationId, install.pipelineId)
+  const departments = ensureDefaultDepartments(install)
+  const available = isPaidTier(getFeaturePlan(install))
+    ? departments
+    : departments.slice(0, 1)
+  const selected = available.find((d) => d.id === department) ?? available[0]
+  const pipelineId = selected?.pipelineId ?? install.pipelineId
+  const pipeline = await getPipeline(locationId, pipelineId)
   if (!pipeline) {
     return (
       <div>
@@ -46,16 +54,34 @@ export default async function TicketsPage({
   }
 
   const [opps, userNames] = await Promise.all([
-    listOpportunities(locationId, install.pipelineId),
+    listOpportunities(locationId, pipelineId),
     usersById(locationId),
   ])
   const stages = pipeline.stages
     .slice()
     .sort((a, b) => a.position - b.position)
     .map((s) => ({ id: s.id, name: s.name }))
-  const tickets = opps.map((o) =>
-    mapOpportunityToTicket(o, stages, install.customFieldIds, userNames),
+  const details = await getTicketDetails(
+    locationId,
+    opps.map((o) => o.id),
   )
+  const tickets = opps.map((o) => {
+    const t = mapOpportunityToTicket(
+      o,
+      stages,
+      install.customFieldIds,
+      userNames,
+    )
+    const d = details.get(o.id)
+    return {
+      ...t,
+      dueAt: d?.dueAt,
+      firstResponseAt: d?.firstResponseAt
+        ? new Date(d.firstResponseAt)
+        : undefined,
+      resolvedAt: d?.resolvedAt ? new Date(d.resolvedAt) : undefined,
+    }
+  })
 
   return (
     <div>
@@ -68,6 +94,9 @@ export default async function TicketsPage({
         locationId={locationId}
         stages={stages}
         initialTickets={tickets}
+        departments={available.map((d) => ({ id: d.id, name: d.name }))}
+        departmentId={selected?.id}
+        sla={isPaidTier(getFeaturePlan(install)) ? selected?.sla : undefined}
       />
     </div>
   )

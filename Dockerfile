@@ -11,6 +11,9 @@ RUN mkdir -p public
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
+FROM deps AS production-deps
+RUN npm prune --omit=dev --ignore-scripts --no-audit --no-fund
+
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
@@ -18,7 +21,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3810
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=production-deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 EXPOSE 3810
 CMD ["node_modules/.bin/next", "start", "-p", "3810"]
