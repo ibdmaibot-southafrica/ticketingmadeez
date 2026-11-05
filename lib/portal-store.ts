@@ -93,6 +93,11 @@ export async function readPortalSession(token?: string) {
   )
   return result.rows[0] ?? null
 }
+export async function endPortalSession(token?: string) {
+  if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return
+  await ready()
+  await getPool().query('DELETE FROM tmez_portal_sessions WHERE token_hash=$1', [digest(token)])
+}
 export async function listPortalGrants(locationId: string, ticketId: string) {
   await ready()
   return (

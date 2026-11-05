@@ -20,7 +20,7 @@ export default async function ConfigPage({
   if (!locationId) return <NoLocation />
   const install = await getInstall(locationId)
   if (!install) return <NoInstall locationId={locationId} />
-  const pool = await getAssignmentPoolStatus(locationId)
+  const pool = await getAssignmentPoolStatus(locationId).catch(() => null)
 
   return (
     <div>

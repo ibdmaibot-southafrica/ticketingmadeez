@@ -28,6 +28,7 @@ const app = spawn(
       GHL_APP_SHARED_SECRET: 'test-shared-secret',
       APP_BASE_URL: 'http://localhost:3820',
       FIXTURE_PLAN: 'paid',
+      FIXTURE_TICKET_DELAY_MS: '18000',
       TMEZ_AI_API_KEY: '',
       TMEZ_AI_MODEL: '',
       TMEZ_AI_DAILY_LIMIT: '0',

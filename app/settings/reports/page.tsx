@@ -42,7 +42,7 @@ export default async function ReportsPage({
   const perDept: DeptStats[] = []
   for (const dept of departments) {
     const pipeline = await getPipeline(locationId, dept.pipelineId)
-    if (!pipeline) continue
+    if (!pipeline) throw new Error('A department support pipeline is unavailable')
     const opps = await listOpportunities(locationId, dept.pipelineId)
     const details = await getTicketDetails(
       locationId,

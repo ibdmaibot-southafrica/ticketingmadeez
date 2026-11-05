@@ -3,12 +3,13 @@ const assert = require('node:assert/strict')
 const { spawn } = require('node:child_process')
 const { randomBytes, createHmac } = require('node:crypto')
 const secret = randomBytes(32).toString('hex')
-const base = 'http://localhost:3812'
+const port=39000+(process.pid%500)
+const base = 'http://localhost:'+port
 let server
 before(async () => {
   server = spawn(
     process.execPath,
-    ['node_modules/next/dist/bin/next', 'start', '-p', '3812'],
+    ['node_modules/next/dist/bin/next', 'start', '-p', String(port)],
     {
       env: { ...process.env, SESSION_SECRET: secret, APP_BASE_URL: base },
       stdio: 'ignore',

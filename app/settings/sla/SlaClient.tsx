@@ -125,7 +125,7 @@ export function SlaClient({ locationId, plan, departments }: { locationId: strin
         </p>
       ) : (
         <p className="mt-4 text-xs text-ink/50">
-          When an SLA is <b>on</b>, a workflow in the account should trigger on new tickets and check the response/resolution timers. See the Getting Started guide for the workflow template.
+          Active targets control the ticket board indicators and measured reports. Tracking uses elapsed calendar time. Customer notifications require a separately configured CRM workflow; this app does not send breach alerts automatically.
         </p>
       )}
     </div>
