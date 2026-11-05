@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 
 const NAV = [
   { href: '/settings/tickets', label: 'Tickets' },
+  { href: '/settings/phone-setup', label: 'Phone setup' },
   { href: '/settings/departments', label: 'Departments' },
   { href: '/settings/sla', label: 'SLA policies' },
   { href: '/settings/reports', label: 'Reports' },
