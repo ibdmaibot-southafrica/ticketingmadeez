@@ -10,6 +10,7 @@ export type Session = {
   locationId: string
   userId: string
   role: string
+  agencyOwner?: boolean
   exp: number
 }
 function secret() {

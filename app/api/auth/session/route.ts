@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
         locationId: c.activeLocation,
         userId: c.userId,
         role: c.role,
+        agencyOwner:c.type==='agency' && c.role==='admin' && c.isAgencyOwner===true,
         exp: Date.now() + 15 * 60 * 1000,
       }),
       {
