@@ -132,3 +132,30 @@ test('concurrent AI reservations respect the monthly budget and settle idempoten
     'unexpected cost above reservation switches AI off',
   )
 })
+
+
+test('customer keys are encrypted, tenant-bound and never fall back to publisher billing', async () => {
+  const secrets = load('lib/ai-credentials.ts')
+  const previous = process.env.SESSION_SECRET
+  process.env.SESSION_SECRET = 'synthetic-encryption-secret-at-least-32-characters'
+  try {
+    const value = 'sk-fixture-customer-key-not-a-real-credential'
+    const cipher = secrets.encryptAiKey('credential-a', 'openai', value)
+    assert.equal(cipher.includes(value), false)
+    assert.equal(secrets.decryptAiKey('credential-a', 'openai', cipher), value)
+    assert.throws(() => secrets.decryptAiKey('credential-b', 'openai', cipher))
+    assert.throws(() => secrets.decryptAiKey('credential-a', 'gemini', cipher))
+    await secrets.saveCustomerAiKey('credential-a', 'openai', value)
+    assert.equal(await secrets.customerAiKey('credential-a', 'openai'), value)
+    assert.equal(await secrets.customerAiKey('credential-b', 'openai'), undefined)
+    assert.equal(JSON.stringify(await secrets.customerAiConnections('credential-a')).includes(value), false)
+    await saveAiSettings('credential-a', { enabled:true,provider:'openai',bracket:'10-50',monthlyLimitUsd:10 })
+    await secrets.disconnectCustomerAiKey('credential-a','openai')
+    assert.equal(await secrets.customerAiKey('credential-a', 'openai'), undefined)
+    assert.equal((await getAiSettings('credential-a')).enabled, false)
+    assert.equal(aiProviderConfig('openai').key, undefined)
+  } finally {
+    if(previous === undefined) delete process.env.SESSION_SECRET
+    else process.env.SESSION_SECRET = previous
+  }
+})

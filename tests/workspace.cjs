@@ -132,7 +132,7 @@ test('AI drafting uses published account articles, disables provider storage and
   }
   try {
     assert.equal(
-      (await knowledgeDraft('Reset password', articles)).text,
+      (await knowledgeDraft('Reset password', articles, 'openai', 'isolated-fixture-key')).text,
       'Use the reset link.',
     )
     assert.equal(calls, 1)
@@ -192,13 +192,13 @@ test('Claude and Gemini adapters parse drafts and billable usage without live pr
     })
   }
   try {
-    const claude = await knowledgeDraft('Question', [], 'anthropic')
+    const claude = await knowledgeDraft('Question', [], 'anthropic', 'isolated-fixture')
     assert.deepEqual(claude, {
       text: 'Claude fixture answer',
       inputTokens: 12,
       outputTokens: 4,
     })
-    const gemini = await knowledgeDraft('Question', [], 'gemini')
+    const gemini = await knowledgeDraft('Question', [], 'gemini', 'isolated-fixture')
     assert.deepEqual(gemini, {
       text: 'Gemini fixture answer',
       inputTokens: 12,

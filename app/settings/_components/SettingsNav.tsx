@@ -11,6 +11,7 @@ const NAV = [
   { href: '/settings/knowledge', label: 'Knowledge base' },
   { href: '/settings/projects', label: 'Projects and time' },
   { href: '/settings/config', label: 'Settings' },
+  { href: '/settings/help', label: 'Help and setup' },
 ]
 
 export function SettingsNav() {

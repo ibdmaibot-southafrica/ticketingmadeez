@@ -111,6 +111,10 @@ global.fetch = async (input, options) => {
   )
   if (['localhost', '127.0.0.1'].includes(url.hostname))
     return originalFetch(input, options)
+  if (url.hostname === 'api.openai.com' && options?.headers?.Authorization === 'Bearer sk-fixture-customer-key-not-a-real-credential') {
+    if (url.pathname.startsWith('/v1/models/')) return Response.json({ id:'gpt-5.4-mini-2026-03-17' })
+    if (url.pathname === '/v1/responses') return Response.json({ output:[{type:'message',content:[{type:'output_text',text:'Synthetic customer-owned draft'}]}],usage:{input_tokens:100,output_tokens:20} })
+  }
   if (url.hostname !== 'fixture.highlevel.invalid')
     throw new Error('External traffic blocked in isolated test')
   let body

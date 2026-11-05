@@ -17,6 +17,7 @@ import {
 import { listActiveUsers, displayName } from '@/lib/users'
 import { ticketAccess } from '@/lib/ticket-access'
 import { getAiSettings, getAiBudget, saveAiSettings } from '@/lib/ai-budget'
+import { customerAiKey,customerAiConnections } from '@/lib/ai-credentials'
 import {
   AI_BRACKETS,
   aiProviderOptions,
@@ -147,7 +148,7 @@ export async function GET(req: NextRequest) {
             ai: {
               settings: await getAiSettings(locationId),
               budget: await getAiBudget(locationId),
-              providers: aiProviderOptions(),
+              providers: aiProviderOptions((await customerAiConnections(locationId)).map(c=>c.provider)),
             },
           }
         : {}),
@@ -211,13 +212,13 @@ export async function POST(req: NextRequest) {
         )
       if (
         settings.enabled &&
-        (!aiProviderConfig(settings.provider).configured ||
-          Number(process.env.TMEZ_AI_DAILY_LIMIT || 0) < 1)
+        (!aiProviderConfig(settings.provider,await customerAiKey(locationId,settings.provider)).configured ||
+          !Number.isInteger(Number(process.env.TMEZ_AI_DAILY_LIMIT ?? 1000)) || Number(process.env.TMEZ_AI_DAILY_LIMIT ?? 1000) < 1 || Number(process.env.TMEZ_AI_DAILY_LIMIT ?? 1000) > 1000)
       )
         return NextResponse.json(
           {
             error:
-              'Configure this provider, model, token pricing and an operator daily limit before enabling AI. Settings can be saved with AI off.',
+              'Connect your own OpenAI API key before enabling AI. AI usage is billed directly to you by OpenAI and is not included in the trial or app subscription.',
           },
           { status: 409 },
         )

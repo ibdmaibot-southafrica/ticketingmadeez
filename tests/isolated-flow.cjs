@@ -452,6 +452,31 @@ test('AI is disabled without an explicit provider setup and never silently spend
   })
   assert.equal(user.status, 403)
 })
+test('customer OpenAI connection requires acknowledgement, administrator access and tenant ownership', async () => {
+ const base='http://localhost:3814',cookie=await login(3814)
+ const headers={Cookie:cookie,Origin:base,'Content-Type':'application/json'}
+ const connect=(data,h=headers)=>fetch(base+'/api/workspace/credentials',{method:'POST',headers:h,body:JSON.stringify(data)})
+ const connection={action:'connect',locationId:'tenant-a',provider:'openai',apiKey:'sk-fixture-customer-key-not-a-real-credential',billingAccepted:true}
+ assert.equal((await connect({...connection,billingAccepted:false})).status,400)
+ assert.equal((await connect(connection,{...headers,Cookie:teamCookie(3814)})).status,403)
+ assert.equal((await connect({...connection,locationId:'tenant-b'})).status,403)
+ assert.equal((await connect(connection)).status,200)
+ const connected=await(await fetch(base+'/api/workspace?locationId=tenant-a',{headers})).json()
+ assert.equal(connected.ai.settings.enabled,false)
+ assert.equal(connected.ai.providers.find(p=>p.provider==='openai').connected,true)
+ assert.equal(JSON.stringify(connected).includes(connection.apiKey),false)
+ const configure=enabled=>fetch(base+'/api/workspace',{method:'POST',headers,body:JSON.stringify({locationId:'tenant-a',action:'ai-settings',data:{enabled,provider:'openai',bracket:'10-50',monthlyLimitUsd:10}})})
+ assert.equal((await configure(true)).status,200)
+ const article=await fetch(base+'/api/workspace',{method:'POST',headers,body:JSON.stringify({locationId:'tenant-a',action:'article',data:{title:'Reset password',body:'Use the reset password link.',published:true}})})
+ assert.equal(article.status,200)
+ const draft=await fetch(base+'/api/workspace/assist',{method:'POST',headers,body:JSON.stringify({locationId:'tenant-a',question:'Reset password',consent:true})})
+ assert.equal(draft.status,200)
+ assert.equal((await draft.json()).draft,'Synthetic customer-owned draft')
+
+ assert.equal((await connect({action:'disconnect',locationId:'tenant-a',provider:'openai'})).status,200)
+ assert.equal((await configure(true)).status,409)
+})
+
 after(() => servers.forEach((server) => server.kill()))
 async function login(port) {
   const base = 'http://localhost:' + port

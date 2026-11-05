@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { AI_BRACKETS, type AiSettings, type AiProvider } from '@/lib/ai-config'
+import { OpenAiConnection } from './OpenAiConnection'
 export type AiControlData = {
   settings: AiSettings
   budget: { spentMicros: number; reservedMicros: number }
@@ -9,16 +10,20 @@ export type AiControlData = {
     name: string
     configured: boolean
     model: string | null
+    connected:boolean
   }[]
 }
 export function AiControls({
   data,
   busy,
   save,
+  locationId,onConnectionChange,
 }: {
   data: AiControlData
   busy: boolean
   save: (value: AiSettings) => Promise<boolean>
+  locationId:string
+  onConnectionChange:()=>void
 }) {
   const [settings, setSettings] = useState<AiSettings>(data.settings)
   const range = AI_BRACKETS[settings.bracket],
@@ -38,6 +43,8 @@ export function AiControls({
     'mt-1 w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm'
   return (
     <section className="workspace-panel">
+      <div className="mb-5 rounded-xl border-2 border-[#0891B2] bg-cyan/10 p-4"><p className="font-heading text-lg font-bold">AI usage is not included</p><p className="mt-2 text-sm">Your 14-day app trial and app subscription do not include AI usage or AI credits. Connect your own OpenAI API account. OpenAI bills you directly. TicketingMadeEZ does not rebill or pay your AI charges.</p><a href="/help#connect-openai" target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-semibold underline">Step-by-step OpenAI setup guide</a></div>
+      <OpenAiConnection locationId={locationId} connected={!!data.providers.find(p=>p.provider==='openai')?.connected} onChange={onConnectionChange}/>
       <div className="flex items-center justify-between gap-4">
         <h2>AI controls</h2>
         <span className="text-sm font-semibold">{status}</span>
@@ -71,7 +78,7 @@ export function AiControls({
             {data.providers.map((p) => (
               <option key={p.provider} value={p.provider}>
                 {p.name}
-                {p.configured ? '' : ' · setup required'}
+                {p.configured ? '' : p.provider==='openai'?' · connect your API key':' · advanced setup required'}
               </option>
             ))}
           </select>
@@ -167,7 +174,7 @@ export function AiControls({
         <p className="mt-2">
           {provider?.configured
             ? `Configured model: ${provider.model}`
-            : 'The operator must configure provider credentials, a model and verified token rates before AI can be enabled.'}
+            : 'Connect your own OpenAI API key above. The recommended GPT-5.4 mini model is already selected. OpenAI bills AI usage directly to your account.'}
         </p>
       </div>
     </section>

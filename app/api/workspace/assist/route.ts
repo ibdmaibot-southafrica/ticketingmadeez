@@ -11,6 +11,7 @@ import {
 } from '@/lib/knowledge-assist'
 import { getAiSettings, reserveAiBudget, settleAiBudget } from '@/lib/ai-budget'
 import { aiProviderConfig, aiCostMicros } from '@/lib/ai-config'
+import { customerAiKey } from '@/lib/ai-credentials'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
@@ -34,9 +35,10 @@ export async function POST(req: NextRequest) {
       { error: 'Administrator access required' },
       { status: 403 },
     )
-  const limit = Number(process.env.TMEZ_AI_DAILY_LIMIT || 0)
+  const limit = Number(process.env.TMEZ_AI_DAILY_LIMIT ?? 1000)
   const settings = await getAiSettings(locationId),
-    provider = aiProviderConfig(settings.provider)
+    customerKey=await customerAiKey(locationId,settings.provider),
+    provider = aiProviderConfig(settings.provider,customerKey)
   if (
     !settings.enabled ||
     !provider.configured ||
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error:
-          'AI drafts are off. Enable them in AI controls after the operator configures a provider, model, token pricing and daily request limit.',
+          'AI drafts are off. Connect your own OpenAI API account, review direct provider billing, and enable AI in the controls. No AI usage is included in the app trial or subscription.',
       },
       { status: 503 },
     )
@@ -107,7 +109,7 @@ export async function POST(req: NextRequest) {
       )
     // Failures retain their reservation because the provider may have billed a timed-out call.
     // This is conservative accounting, not a promise about the provider's final invoice.
-    const result = await knowledgeDraft(question, articles, settings.provider)
+    const result = await knowledgeDraft(question, articles, settings.provider,customerKey)
     if (result.inputTokens !== undefined && result.outputTokens !== undefined)
       await settleAiBudget(
         locationId,

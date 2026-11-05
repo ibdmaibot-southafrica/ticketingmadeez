@@ -130,15 +130,17 @@ export function HubClient({
               data={data.ai}
               busy={busy}
               save={(value) => save('ai-settings', value)}
+              locationId={locationId}
+              onConnectionChange={()=>setRevision(v=>v+1)}
             />
           )}
           {data.admin && (
             <section className="workspace-panel">
               <h2>AI answer draft</h2>
               <p className="mt-1 text-xs text-ink/60">
-                Uses matching published articles from this account. Requires an
-                operator-configured AI provider and daily limit. Drafts need
-                your review and are never sent automatically.
+                Uses matching published articles from this account and your own
+                connected AI account. AI usage is excluded from the app trial and
+                subscription. Drafts need your review and are never sent automatically.
               </p>
               <form
                 className="mt-3 space-y-3"
@@ -192,8 +194,9 @@ export function HubClient({
                   {data.ai?.providers.find(
                     (p) => p.provider === data.ai?.settings.provider,
                   )?.name || 'the selected AI provider'}{' '}
-                  to draft an answer. Provider usage may be charged to the
-                  configured account.
+                  to draft an answer using my own API account. I am responsible
+                  for the provider's AI charges. No AI usage is included in the
+                  app trial or subscription.
                 </label>
                 <button
                   className={button}
