@@ -1,4 +1,5 @@
 'use client'
+import { accountFetch } from '@/lib/account-fetch'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -36,7 +37,7 @@ export function SlaClient({ locationId, plan, departments }: { locationId: strin
     setSavedId(null)
     const row = rows.find((r) => r.id === id)
     if (!row || !row.sla) return
-    const res = await fetch(`/api/departments/${encodeURIComponent(id)}`, {
+    const res = await accountFetch(`/api/departments/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ locationId, sla: row.sla }),

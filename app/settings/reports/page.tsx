@@ -97,7 +97,7 @@ export default async function ReportsPage({
           />
           <StatTile label="Resolution rate" value={`${resolutionRate}%`} />
           <StatTile
-            label="SLA compliance"
+            label="Resolution SLA compliance"
             value={compliance == null ? '--' : `${Math.round(compliance)}%`}
             paidOnly
             plan={getFeaturePlan(install)}
@@ -120,7 +120,7 @@ export default async function ReportsPage({
                   <th className="text-right py-2 font-semibold">
                     Avg response
                   </th>
-                  <th className="text-right py-2 font-semibold">SLA</th>
+                  <th className="text-right py-2 font-semibold">Resolution SLA</th>
                 </tr>
               </thead>
               <tbody>

@@ -21,7 +21,7 @@ export function SettingsNav() {
   const qs = params.toString() ? `?${params.toString()}` : ''
 
   return (
-    <nav className="flex flex-col gap-1 p-3">
+    <nav className="flex md:flex-col gap-1 overflow-x-auto p-3">
       {NAV.map((item) => {
         const active =
           pathname === item.href || pathname.startsWith(item.href + '/')
@@ -30,7 +30,7 @@ export function SettingsNav() {
             key={item.href}
             href={`${item.href}${qs}`}
             className={
-              'px-3 py-2 rounded-md text-sm transition-colors ' +
+              'shrink-0 whitespace-nowrap px-3 py-2 rounded-md text-sm transition-colors ' +
               (active
                 ? 'bg-cyan/15 text-cyan'
                 : 'text-white/70 hover:text-white hover:bg-white/5')

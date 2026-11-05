@@ -1,10 +1,11 @@
 'use client'
+import { accountFetch } from '@/lib/account-fetch'
 import { useState } from 'react'
 export function OpenAiConnection({locationId,connected,onChange}:{locationId:string;connected:boolean;onChange:()=>void}){
  const [apiKey,setApiKey]=useState(''),[accepted,setAccepted]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('')
  async function update(action:'connect'|'disconnect'){
   if(busy)return;setBusy(true);setError('');setMessage('')
-  try{const r=await fetch('/api/workspace/credentials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locationId,provider:'openai',action,...(action==='connect'?{apiKey,billingAccepted:accepted}:{})})});const result=await r.json();if(!r.ok)throw new Error(result.error);setApiKey('');setAccepted(false);setMessage(result.message);onChange()}catch(e){setError((e as Error).message)}finally{setBusy(false)}
+  try{const r=await accountFetch('/api/workspace/credentials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locationId,provider:'openai',action,...(action==='connect'?{apiKey,billingAccepted:accepted}:{})})});const result=await r.json();if(!r.ok)throw new Error(result.error);setApiKey('');setAccepted(false);setMessage(result.message);onChange()}catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <div className="mb-6 rounded-xl border border-ink/15 p-4"><h3 className="font-heading font-bold">1. Connect your OpenAI account</h3><p className="mt-2 text-sm">{connected?'Your OpenAI API key is connected.':'Use your own API key. Your ChatGPT password is not an API key.'} Recommended model: GPT-5.4 mini.</p><div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold underline"><a target="_blank" rel="noreferrer" href="https://platform.openai.com/api-keys">Open API keys</a><a target="_blank" rel="noreferrer" href="https://platform.openai.com/account/billing/overview">Open OpenAI billing</a><a href="/help#connect-openai" target="_blank" rel="noreferrer">Show me the steps</a></div>
   {error&&<p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}{message&&<p role="status" className="mt-3 text-sm">{message}</p>}

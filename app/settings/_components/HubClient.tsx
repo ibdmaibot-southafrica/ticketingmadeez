@@ -1,4 +1,5 @@
 'use client'
+import { accountFetch } from '@/lib/account-fetch'
 import { useEffect, useState } from 'react'
 import { AiControls, type AiControlData } from './AiControls'
 import type {
@@ -43,7 +44,7 @@ export function HubClient({
     [aiSources, setAiSources] = useState<{ id: string; title: string }[]>([])
   useEffect(() => {
     const controller = new AbortController()
-    fetch(`/api/workspace?locationId=${encodeURIComponent(locationId)}`, {
+    accountFetch(`/api/workspace?locationId=${encodeURIComponent(locationId)}`, {
       signal: controller.signal,
     })
       .then(async (r) => {
@@ -63,7 +64,7 @@ export function HubClient({
     setBusy(true)
     setError('')
     try {
-      const r = await fetch('/api/workspace', {
+      const r = await accountFetch('/api/workspace', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ locationId, action, data: value, id }),
@@ -152,7 +153,7 @@ export function HubClient({
                   setError('')
                   setAiDraft('')
                   try {
-                    const r = await fetch('/api/workspace/assist', {
+                    const r = await accountFetch('/api/workspace/assist', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({

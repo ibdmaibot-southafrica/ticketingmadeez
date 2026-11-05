@@ -15,8 +15,8 @@ export default function LandingPage() {
         <Card title="Free tier">
           <ul className="space-y-1 text-sm">
             <li>Single ticket queue</li>
-            <li>Email-to-ticket</li>
-            <li>Auto-acknowledgement</li>
+            <li>CRM workflow-based email intake</li>
+            <li>CRM workflow-based acknowledgements</li>
             <li>Manual or round-robin assignment</li>
           </ul>
         </Card>

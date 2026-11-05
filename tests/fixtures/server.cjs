@@ -34,9 +34,10 @@ const install = {
 }
 pg.Pool = class {
   async connect() {
-    return { query: workspaceQuery, release() {} }
+    return { query: (...args) => this.query(...args), release() {} }
   }
   async query(sql, args = []) {
+    if(['BEGIN','COMMIT','ROLLBACK'].includes(sql) || sql.includes('pg_advisory_xact_lock')) return workspaceQuery(sql,args)
     if (
       sql.includes('tmez_ticket_') ||
       sql.includes('tmez_hub_') ||

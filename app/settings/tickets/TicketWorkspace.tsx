@@ -1,4 +1,5 @@
 'use client'
+import { accountFetch } from '@/lib/account-fetch'
 
 import { useEffect, useRef, useState } from 'react'
 import type { Ticket } from '@/lib/ghl-data'
@@ -54,7 +55,7 @@ export function TicketWorkspace({
     const controller = new AbortController()
     let refresh: ReturnType<typeof setTimeout> | undefined
     setLoadState('loading')
-    fetch(`${prefix}/workspace?locationId=${encodeURIComponent(locationId)}`, {
+    accountFetch(`${prefix}/workspace?locationId=${encodeURIComponent(locationId)}`, {
       signal: controller.signal,
     })
       .then(async (r) => {
@@ -93,7 +94,7 @@ export function TicketWorkspace({
     setError('')
     setSaved('')
     try {
-      const response = await fetch(prefix + path, {
+      const response = await accountFetch(prefix + path, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ locationId, ...body }),
@@ -142,7 +143,7 @@ export function TicketWorkspace({
     setBusy(true)
     setError('')
     try {
-      const r = await fetch(prefix + '/portal', {
+      const r = await accountFetch(prefix + '/portal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ locationId, revokeId }),
@@ -150,7 +151,7 @@ export function TicketWorkspace({
       const result = await r.json()
       if (!r.ok) throw new Error(result.error)
       if (result.url) setPortalLink(result.url)
-      const list = await fetch(
+      const list = await accountFetch(
         `${prefix}/portal?locationId=${encodeURIComponent(locationId)}`,
       )
       const grants = await list.json()
@@ -433,7 +434,7 @@ export function TicketWorkspace({
                     className="mt-3 text-xs underline"
                     onClick={async () => {
                       try {
-                        const r = await fetch(
+                        const r = await accountFetch(
                           `${prefix}/portal?locationId=${encodeURIComponent(locationId)}`,
                         )
                         const result = await r.json()

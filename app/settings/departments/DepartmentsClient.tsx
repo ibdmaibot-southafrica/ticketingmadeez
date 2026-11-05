@@ -1,4 +1,5 @@
 'use client'
+import { accountFetch } from '@/lib/account-fetch'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -37,7 +38,7 @@ export function DepartmentsClient({
       setErr('Pick a pipeline.')
       return
     }
-    const res = await fetch('/api/departments', {
+    const res = await accountFetch('/api/departments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ locationId, name: newName.trim(), pipelineId: newPipelineId }),
@@ -58,7 +59,7 @@ export function DepartmentsClient({
       return
     }
     if (!confirm('Delete this department? Existing tickets in the pipeline stay.')) return
-    const res = await fetch(`/api/departments/${encodeURIComponent(id)}?locationId=${encodeURIComponent(locationId)}`, {
+    const res = await accountFetch(`/api/departments/${encodeURIComponent(id)}?locationId=${encodeURIComponent(locationId)}`, {
       method: 'DELETE',
     })
     if (!res.ok) {

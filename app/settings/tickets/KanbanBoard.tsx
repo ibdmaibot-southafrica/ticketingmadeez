@@ -1,4 +1,5 @@
 'use client'
+import { accountFetch } from '@/lib/account-fetch'
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -93,7 +94,7 @@ export function KanbanBoard({
         if (name === 'closed') return 'lost'
         return 'open'
       })()
-      const res = await fetch(`/api/tickets/${encodeURIComponent(ticketId)}`, {
+      const res = await accountFetch(`/api/tickets/${encodeURIComponent(ticketId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ locationId, stageId: toStageId, status }),

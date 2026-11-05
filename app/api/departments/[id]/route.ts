@@ -2,7 +2,7 @@ import { getFeaturePlan } from '@/lib/entitlements'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getInstall, isPaidTier } from '@/lib/kv'
-import { removeDepartment, upsertDepartment } from '@/lib/departments'
+import { removeDepartment, patchDepartment } from '@/lib/departments'
 import { getPipeline } from '@/lib/ghl-data'
 
 export const runtime = 'nodejs'
@@ -75,7 +75,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Choose a pipeline in this account' }, { status: 400 })
   if (install.departments?.some(d => d.id !== id && (d.pipelineId === next.pipelineId || d.name.toLowerCase() === next.name.toLowerCase())))
     return NextResponse.json({ error: 'Each department needs a unique name and pipeline' }, { status: 409 })
-  const departments = await upsertDepartment(locationId, next)
+  const departments = await patchDepartment(locationId, id, patch)
   return NextResponse.json({ ok: true, departments })
   } catch { return NextResponse.json({ error: 'Unable to save the department. Try again.' }, { status: 503 }) }
 }
