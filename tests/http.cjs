@@ -56,8 +56,10 @@ test('anonymous writes and account pages require authentication', async () => {
   const r = await fetch(base + '/settings?locationId=tenant-a', {
     redirect: 'manual',
   })
-  assert.equal(r.status, 307)
-  assert.match(r.headers.get('location'), /auth/)
+  assert.equal(r.status, 200)
+  assert.equal(r.headers.get('location'), null)
+  assert.match(r.headers.get('cache-control'), /no-store/)
+  assert.match(await r.text(), /Verifying account access/)
 })
 test('signed session cannot cross tenant boundaries', async () => {
   const r = await fetch(base + '/api/tickets/test', {

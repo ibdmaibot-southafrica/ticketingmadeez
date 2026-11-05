@@ -28,7 +28,10 @@ export default function AuthPage() {
         if (!r.ok) throw new Error(data.error)
         if (!active) return
         const next =
-          new URLSearchParams(window.location.search).get('next') || '/settings'
+          new URLSearchParams(window.location.search).get('next') ||
+          (window.location.pathname.startsWith('/settings')
+            ? window.location.pathname + window.location.search
+            : '/settings')
         const target = new URL(next, window.location.origin)
         if (
           target.origin !== window.location.origin ||

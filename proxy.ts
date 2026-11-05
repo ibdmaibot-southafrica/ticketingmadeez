@@ -11,7 +11,9 @@ export async function proxy(req: NextRequest) {
       )
     const url = new URL('/auth', req.url)
     url.searchParams.set('next', req.nextUrl.pathname + req.nextUrl.search)
-    return NextResponse.redirect(url)
+    const response = NextResponse.rewrite(url)
+    response.headers.set('Cache-Control', 'private, no-store')
+    return response
   }
   let locationId = req.nextUrl.searchParams.get('locationId')
   if (api && !['GET', 'HEAD'].includes(req.method)) {
