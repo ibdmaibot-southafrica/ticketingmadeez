@@ -1,5 +1,5 @@
 import { env, REDIRECT_URI } from './env'
-import { getInstall, saveInstall, updateInstall, type LocationInstall } from './kv'
+import { getInstall, saveInstall, updateInstall, getPool, type LocationInstall } from './kv'
 
 type TokenResponse = {
   access_token: string
@@ -86,28 +86,43 @@ async function fetchInstalledLocations(agencyAccessToken: string, companyId: str
 }
 
 export async function refreshLocationToken(install: LocationInstall): Promise<LocationInstall> {
+  const client = await getPool().connect()
+  try {
+  await client.query('BEGIN')
+  const current = await client.query<{data:LocationInstall}>('SELECT data FROM tmez_installs WHERE location_id=$1 FOR UPDATE',[install.locationId])
+  const latest = current.rows[0]?.data
+  if (!latest) throw new Error('Install disappeared during refresh')
+  if (latest.expiresAt - Date.now() > 60000) { await client.query('COMMIT'); return latest }
   const t = await postToken(
     new URLSearchParams({
       client_id: env.GHL_CLIENT_ID,
       client_secret: env.GHL_CLIENT_SECRET,
       grant_type: 'refresh_token',
-      refresh_token: install.refreshToken,
+      refresh_token: latest.refreshToken,
     }),
   )
-  const updated = await updateInstall(install.locationId, {
+  const patch = {
     accessToken: t.access_token,
-    refreshToken: t.refresh_token ?? install.refreshToken,
+    refreshToken: t.refresh_token ?? latest.refreshToken,
     expiresAt: Date.now() + t.expires_in * 1000,
-  })
-  if (!updated) throw new Error('Install disappeared during refresh')
-  return updated
+  }
+  await client.query('UPDATE tmez_installs SET data=data || $2::jsonb,updated_at=NOW() WHERE location_id=$1',[install.locationId,JSON.stringify(patch)])
+  await client.query('COMMIT')
+  return {...latest,...patch}
+  } catch(e) { await client.query('ROLLBACK'); throw e } finally { client.release() }
 }
 
+const tokenRefreshes = new Map<string,Promise<LocationInstall>>()
 export async function getValidToken(locationId: string): Promise<string> {
   const install = await getInstall(locationId)
   if (!install) throw new Error(`No install found for location ${locationId}`)
   if (install.expiresAt - Date.now() > 60_000) return install.accessToken
-  const refreshed = await refreshLocationToken(install)
+  let pending = tokenRefreshes.get(locationId)
+  if (!pending) {
+    pending = refreshLocationToken(install).finally(()=>tokenRefreshes.delete(locationId))
+    tokenRefreshes.set(locationId,pending)
+  }
+  const refreshed = await pending
   return refreshed.accessToken
 }
 

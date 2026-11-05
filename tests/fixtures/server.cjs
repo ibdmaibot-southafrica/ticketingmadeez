@@ -120,15 +120,16 @@ global.fetch = async (input, options) => {
   let body
   if (url.pathname === '/opportunities/pipelines')
     body = {
-      pipelines: [{ id: 'fixture-pipeline', name: 'Isolated Support', stages }],
+      pipelines: [{ id: 'fixture-pipeline', name: 'Isolated Support', stages },{ id:'fixture-pipeline-two',name:'Isolated Billing',stages }],
     }
   else if (url.pathname === '/opportunities/search')
-    body = { opportunities: [ticket] }
+    body = { opportunities: url.searchParams.get('pipeline_id') === 'fixture-pipeline-two' ? [] : [ticket] }
   else if (url.pathname === '/users/')
     body = {
       users: [{ id: 'test-user', name: 'Isolated test user', isActive: true }],
     }
   else if (url.pathname === '/opportunities/fixture-ticket') {
+    if (!options?.method || options.method === 'GET') await new Promise(r=>setTimeout(r,Number(process.env.FIXTURE_TICKET_DELAY_MS || 0)))
     if (options?.method === 'PUT') {
       const patch = JSON.parse(options.body)
       if (patch.assignedTo === 'outside-user')

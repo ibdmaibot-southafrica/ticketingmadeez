@@ -114,6 +114,7 @@ export function HubClient({
   }
   return (
     <div className="space-y-6 p-6">
+      <p className="text-xs text-ink/50">This workspace lists up to 500 projects, tasks and knowledge articles, and the latest 1,000 time entries. Billing totals cover only the listed entries.</p>
       {error && (
         <p
           role="alert"

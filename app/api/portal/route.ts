@@ -4,6 +4,7 @@ import {
   consumePortalInvite,
   readPortalSession,
   PORTAL_COOKIE,
+  endPortalSession,
 } from '@/lib/portal-store'
 import { ticketAccess } from '@/lib/ticket-access'
 import { getPipeline } from '@/lib/ghl-data'
@@ -113,6 +114,7 @@ export async function POST(req: NextRequest) {
     )
   try {
     if (parsed.data.action === 'sign-out') {
+      await endPortalSession(req.cookies.get(PORTAL_COOKIE)?.value)
       const response = NextResponse.json({ ok: true }, { headers })
       response.cookies.set(PORTAL_COOKIE, '', {
         httpOnly: true,

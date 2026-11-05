@@ -20,8 +20,9 @@ export async function listActiveUsers(locationId: string): Promise<GhlUser[]> {
   const res = await ghlJson<ListUsersResponse>(
     `/users/?locationId=${encodeURIComponent(locationId)}`,
     { locationId, method: 'GET' },
-  ).catch(() => null)
-  const all = res?.users ?? []
+  )
+  if (!Array.isArray(res.users)) throw new Error('Account users are unavailable')
+  const all = res.users
   return all
     .filter((u) => !u.deleted)
     .filter((u) => u.isActive !== false)
@@ -41,6 +42,6 @@ export function displayName(u: GhlUser): string {
 }
 
 export async function usersById(locationId: string): Promise<Map<string, string>> {
-  const users = await listActiveUsers(locationId).catch(() => [] as GhlUser[])
+  const users = await listActiveUsers(locationId)
   return new Map(users.map((u) => [u.id, displayName(u)]))
 }

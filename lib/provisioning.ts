@@ -43,7 +43,8 @@ async function findOrCreatePipeline(locationId: string, name: string): Promise<s
   const existing = await ghlJson<PipelinesList>(
     `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`,
     { locationId, method: 'GET' },
-  ).catch(() => ({ pipelines: [] as PipelinesList['pipelines'] }))
+  )
+  if (!Array.isArray(existing.pipelines)) throw new Error('Unable to verify existing support pipelines')
   const found = existing.pipelines?.find((p) => p.name === name)
   if (found) return found.id
 
@@ -74,7 +75,8 @@ async function findOrCreateField(
   const existing = await ghlJson<FieldsList>(
     `/locations/${locationId}/customFields?model=opportunity`,
     { locationId, method: 'GET' },
-  ).catch(() => ({ customFields: [] as FieldsList['customFields'] }))
+  )
+  if (!Array.isArray(existing.customFields)) throw new Error('Unable to verify existing ticket fields')
   const wantedFieldKey = `opportunity.ticket_${field.key}`
   // Prefer fieldKey match (canonical) over name match (localizable).
   const found =

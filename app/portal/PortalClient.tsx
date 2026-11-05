@@ -1,11 +1,12 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 type Portal = {
   ticket: { id: string; subject: string; stage: string }
   messages: { id: string; body: string; from: string; createdAt: string }[]
   articles: { id: string; title: string; body: string }[]
 }
 export function PortalClient() {
+  const signedOut = useRef(false)
   const [data, setData] = useState<Portal | null>(null),
     [error, setError] = useState(''),
     [body, setBody] = useState(''),
@@ -14,13 +15,17 @@ export function PortalClient() {
   useEffect(() => {
     let alive = true
     const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | undefined
     async function load() {
       const response = await fetch('/api/portal', {
         signal: controller.signal,
       })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.error)
-      if (alive) {
+      if (!response.ok) {
+        if (alive && [401, 403].includes(response.status)) setData(null)
+        throw new Error(result.error)
+      }
+      if (alive && !signedOut.current) {
         setData(result)
         setError('')
       }
@@ -40,19 +45,22 @@ export function PortalClient() {
       }
       await load()
     }
-    start().catch((e) => {
-      if (alive && e.name !== 'AbortError') setError(e.message)
-    })
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible')
-        load().catch((e) => {
-          if (alive && e.name !== 'AbortError') setError(e.message)
-        })
-    }, 15000)
+    async function poll(initial = false) {
+      try {
+        if (initial) await start()
+        else if (document.visibilityState === 'visible') await load()
+      } catch (e) {
+        if (alive && !signedOut.current && (e as Error).name !== 'AbortError')
+          setError((e as Error).message)
+      } finally {
+        if (alive && !signedOut.current) timer = setTimeout(() => void poll(), 15000)
+      }
+    }
+    void poll(true)
     return () => {
       alive = false
       controller.abort()
-      clearInterval(timer)
+      clearTimeout(timer)
     }
   }, [])
   async function reply(e: React.FormEvent) {
@@ -71,8 +79,11 @@ export function PortalClient() {
       setBody('')
       const read = await fetch('/api/portal')
       const next = await read.json()
-      if (!read.ok) throw new Error(next.error)
-      setData(next)
+      if (!read.ok) {
+        if ([401, 403].includes(read.status)) setData(null)
+        throw new Error(next.error)
+      }
+      if (!signedOut.current) setData(next)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -89,17 +100,26 @@ export function PortalClient() {
           </div>
           {data && (
             <button
+              disabled={busy}
               className="rounded-lg border border-white/30 px-3 py-2 text-sm"
               onClick={async () => {
-                await fetch('/api/portal', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action: 'sign-out' }),
-                })
-                setData(null)
-                setError(
-                  'Signed out. Ask your support team for a new link to return.',
-                )
+                if (busy) return
+                setBusy(true)
+                signedOut.current = true
+                try {
+                  const response = await fetch('/api/portal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'sign-out' }),
+                  })
+                  if (!response.ok) throw new Error('Unable to sign out. Please try again.')
+                  setData(null)
+                  setBody('')
+                  setError('Signed out. Ask your support team for a new link to return.')
+                } catch (e) {
+                  signedOut.current = false
+                  setError((e as Error).message)
+                } finally { setBusy(false) }
               }}
             >
               Sign out

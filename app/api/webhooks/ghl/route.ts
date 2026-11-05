@@ -163,9 +163,6 @@ async function handleEvent(evt: z.infer<typeof eventSchema>, type: string) {
             opportunityId,
             pipelineId: evt.pipelineId,
             currentAssignedTo: evt.assignedTo ?? null,
-          }).catch((e) => {
-            console.error('[webhook opportunity create] auto-assign failed', e)
-            return { skipped: 'error' as const }
           })
           console.log(
             `[webhook opportunity create] opp=${opportunityId} result=${JSON.stringify(result)}`,

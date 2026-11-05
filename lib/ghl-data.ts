@@ -38,13 +38,18 @@ export async function listOpportunities(
     const res = await ghlJson<OpportunitiesResponse>(url, {
       locationId,
       method: 'GET',
-    }).catch(() => null)
-    const batch = res?.opportunities ?? []
+    })
+    if (!Array.isArray(res.opportunities)) throw new Error('Ticket response is unavailable')
+    const batch = res.opportunities
+    if (batch.some((o) => o.pipelineId !== pipelineId || (o.locationId && o.locationId !== locationId)))
+      throw new Error('Ticket response does not match the requested account and pipeline')
+    if (batch.some((o) => opportunities.some((previous) => previous.id === o.id)))
+      throw new Error('Ticket pagination repeated records. Retry the request.')
     opportunities.push(...batch)
-    if (batch.length < perPage) break
+    if (batch.length < perPage) return opportunities
     cursor += 1
   }
-  return opportunities
+  throw new Error('The ticket list exceeds the supported page limit. Narrow the support pipeline before reporting totals.')
 }
 
 export type PipelineDetail = {
@@ -60,7 +65,8 @@ export async function getPipeline(
   const res = await ghlJson<{ pipelines?: PipelineDetail[] }>(
     `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`,
     { locationId, method: 'GET' },
-  ).catch(() => null)
+  )
+  if (!Array.isArray(res.pipelines)) throw new Error('Support pipelines are unavailable')
   return res?.pipelines?.find((p) => p.id === pipelineId) ?? null
 }
 
@@ -70,7 +76,8 @@ export async function listPipelines(
   const res = await ghlJson<{ pipelines?: PipelineDetail[] }>(
     `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`,
     { locationId, method: 'GET' },
-  ).catch(() => null)
+  )
+  if (!Array.isArray(res.pipelines)) throw new Error('Support pipelines are unavailable')
   return res?.pipelines ?? []
 }
 

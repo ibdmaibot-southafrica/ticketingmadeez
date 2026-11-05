@@ -1,7 +1,7 @@
 import { getFeaturePlan } from '@/lib/entitlements'
 import {
   getInstall,
-  updateInstall,
+  getPool,
   type AssignmentPolicy,
   type PlanTier,
 } from './kv'
@@ -47,9 +47,7 @@ export async function getAssignmentPoolStatus(
   if (!install) return null
   const policy = install.assignment ?? DEFAULT_POLICY
   const excluded = new Set(policy.excludeUserIds ?? [])
-  const users = (
-    await listActiveUsers(locationId).catch(() => [] as GhlUser[])
-  ).filter((u) => !excluded.has(u.id))
+  const users = (await listActiveUsers(locationId)).filter((u) => !excluded.has(u.id))
   const cap = poolCapForPlan(getFeaturePlan(install))
   return {
     total: users.length,
@@ -77,7 +75,7 @@ export async function pickNextAssignee(
   const policy = install.assignment ?? DEFAULT_POLICY
   if (!policy.enabled) return null
 
-  const users = await listActiveUsers(locationId).catch(() => [] as GhlUser[])
+  const users = await listActiveUsers(locationId)
   const excluded = new Set(policy.excludeUserIds ?? [])
   const filtered = users.filter((u) => !excluded.has(u.id))
   // Note: opportunity `assignedTo` requires a LOCATION user id. The OAuth
@@ -90,13 +88,12 @@ export async function pickNextAssignee(
   const pool = filtered.slice(0, cap)
   if (pool.length === 0) return null
 
-  const lastIdx = policy.lastAssignedIndex ?? -1
-  const nextIdx = (lastIdx + 1) % pool.length
-  const chosen = pool[nextIdx]
-
-  await updateInstall(locationId, {
-    assignment: { ...policy, lastAssignedIndex: nextIdx },
-  })
+  const result = await getPool().query<{index:number}>(
+    `UPDATE tmez_installs SET data=jsonb_set(data,'{assignment}',COALESCE(data->'assignment','{"enabled":true,"strategy":"round-robin"}'::jsonb) || jsonb_build_object('lastAssignedIndex',(COALESCE((data#>>'{assignment,lastAssignedIndex}')::int,-1)+1)%$2::int)),updated_at=NOW() WHERE location_id=$1 RETURNING (data#>>'{assignment,lastAssignedIndex}')::int AS index`,
+    [locationId,pool.length],
+  )
+  if (!result.rows[0]) throw new Error('Assignment account is unavailable')
+  const chosen = pool[result.rows[0].index]
   return chosen
 }
 
@@ -136,10 +133,13 @@ export async function autoAssignOpportunity(params: {
   const knownPipelines = new Set<string>()
   if (install.pipelineId) knownPipelines.add(install.pipelineId)
   for (const d of install.departments ?? []) knownPipelines.add(d.pipelineId)
-  if (knownPipelines.size > 0 && !knownPipelines.has(params.pipelineId)) {
+  if (!knownPipelines.has(params.pipelineId)) {
     return { skipped: 'unknown-pipeline' }
   }
 
+  const current = await ghlJson<{opportunity:{locationId:string;pipelineId:string;assignedTo?:string}}>(`/opportunities/${encodeURIComponent(params.opportunityId)}`,{locationId:params.locationId,method:'GET'})
+  if (current.opportunity.locationId !== params.locationId || !knownPipelines.has(current.opportunity.pipelineId)) return {skipped:'unknown-pipeline'}
+  if (current.opportunity.assignedTo) return {skipped:'already-assigned'}
   const chosen = await pickNextAssignee(params.locationId)
   if (!chosen) return { skipped: 'no-assignee' }
 

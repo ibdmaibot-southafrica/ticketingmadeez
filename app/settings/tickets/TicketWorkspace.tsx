@@ -51,14 +51,8 @@ export function TicketWorkspace({
     dialog.current?.showModal()
   }, [])
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible' && !busy)
-        setRevision((n) => n + 1)
-    }, 15000)
-    return () => clearInterval(timer)
-  }, [busy])
-  useEffect(() => {
     const controller = new AbortController()
+    let refresh: ReturnType<typeof setTimeout> | undefined
     setLoadState('loading')
     fetch(`${prefix}/workspace?locationId=${encodeURIComponent(locationId)}`, {
       signal: controller.signal,
@@ -70,6 +64,7 @@ export function TicketWorkspace({
       })
       .then((result) => {
         setData(result)
+        setError('')
         setLoadState('ready')
       })
       .catch((e) => {
@@ -78,7 +73,14 @@ export function TicketWorkspace({
           setLoadState('error')
         }
       })
-    return () => controller.abort()
+      .finally(() => {
+        if (!controller.signal.aborted)
+          refresh = setTimeout(() => setRevision((n) => n + 1), 15000)
+      })
+    return () => {
+      clearTimeout(refresh)
+      controller.abort()
+    }
   }, [prefix, locationId, revision])
   async function mutate(
     path: string,

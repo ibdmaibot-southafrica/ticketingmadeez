@@ -14,13 +14,14 @@ const testPublicKey = webhookKeys.publicKey.export({
 })
 const fixture =
   'U2FsdGVkX1928I0KCQC8Xembd2JhlHg6Fj2D/obg8ptrav569sw9c1S4BzxHxQqMYIc1EGfoxsgo/2F56cY5BJnUEvjKbt5EA5KK8jvtf+LI3ggIjFjkbxcIf8wADtgVyV/IO3w6AE5KLYyl5VYaOQ=='
+const FREE_PORT=40000+(process.pid%5000)*4,PAID_PORT=FREE_PORT+1,INCLUDED_PORT=FREE_PORT+2
 const servers = []
 const secrets = new Map()
 before(async () => {
   for (const [port, plan] of [
-    [3813, 'free'],
-    [3814, 'paid'],
-    [3815, 'free'],
+    [FREE_PORT, 'free'],
+    [PAID_PORT, 'paid'],
+    [INCLUDED_PORT, 'free'],
   ]) {
     const base = 'http://localhost:' + port
     const secret = randomBytes(32).toString('hex')
@@ -48,7 +49,7 @@ before(async () => {
           GHL_APP_SHARED_SECRET: 'test-shared-secret',
           APP_BASE_URL: base,
           FIXTURE_PLAN: plan,
-          FIXTURE_INCLUDED_PLAN: port === 3815 ? 'paid' : '',
+          FIXTURE_INCLUDED_PLAN: port === INCLUDED_PORT ? 'paid' : '',
           FIXTURE_WEBHOOK_PUBLIC_KEY: testPublicKey,
         },
         stdio: ['ignore', 'ignore', 'pipe'],
@@ -89,8 +90,8 @@ function teamCookie(port) {
 }
 
 test('projects, tasks, timers and billable rates persist with administrator-only rate visibility', async () => {
-  const base = 'http://localhost:3814',
-    cookie = await login(3814)
+  const base = 'http://localhost:' + PAID_PORT,
+    cookie = await login(PAID_PORT)
   const headers = {
     Cookie: cookie,
     Origin: base,
@@ -193,7 +194,7 @@ test('projects, tasks, timers and billable rates persist with administrator-only
     state.time.find((t) => t.description === 'Fixture running timer').minutes,
     1,
   )
-  const userHeaders = { ...headers, Cookie: teamCookie(3814) }
+  const userHeaders = { ...headers, Cookie: teamCookie(PAID_PORT) }
   const user = await (
     await fetch(base + '/api/workspace?locationId=tenant-a', {
       headers: userHeaders,
@@ -277,8 +278,8 @@ test('projects, tasks, timers and billable rates persist with administrator-only
 })
 
 test('customer portal is one-use, ticket-scoped, excludes internal records and revokes active sessions', async () => {
-  const base = 'http://localhost:3814',
-    cookie = await login(3814)
+  const base = 'http://localhost:' + PAID_PORT,
+    cookie = await login(PAID_PORT)
   const headers = {
     Cookie: cookie,
     Origin: base,
@@ -360,7 +361,7 @@ test('customer portal is one-use, ticket-scoped, excludes internal records and r
     (
       await fetch(base + '/api/tickets/fixture-ticket/portal', {
         method: 'POST',
-        headers: { ...headers, Cookie: teamCookie(3814) },
+        headers: { ...headers, Cookie: teamCookie(PAID_PORT) },
         body: JSON.stringify({ locationId: 'tenant-a' }),
       })
     ).status,
@@ -384,8 +385,8 @@ test('customer portal is one-use, ticket-scoped, excludes internal records and r
 })
 
 test('AI is disabled without an explicit provider setup and never silently spends money', async () => {
-  const base = 'http://localhost:3814',
-    cookie = await login(3814)
+  const base = 'http://localhost:' + PAID_PORT,
+    cookie = await login(PAID_PORT)
   const result = await fetch(base + '/api/workspace/assist', {
     method: 'POST',
     headers: {
@@ -443,7 +444,7 @@ test('AI is disabled without an explicit provider setup and never silently spend
   )
   const user = await fetch(base + '/api/workspace', {
     method: 'POST',
-    headers: { ...headers, Cookie: teamCookie(3814) },
+    headers: { ...headers, Cookie: teamCookie(PAID_PORT) },
     body: JSON.stringify({
       locationId: 'tenant-a',
       action: 'ai-settings',
@@ -453,12 +454,12 @@ test('AI is disabled without an explicit provider setup and never silently spend
   assert.equal(user.status, 403)
 })
 test('customer OpenAI connection requires acknowledgement, administrator access and tenant ownership', async () => {
- const base='http://localhost:3814',cookie=await login(3814)
+ const base='http://localhost:' + PAID_PORT,cookie=await login(PAID_PORT)
  const headers={Cookie:cookie,Origin:base,'Content-Type':'application/json'}
  const connect=(data,h=headers)=>fetch(base+'/api/workspace/credentials',{method:'POST',headers:h,body:JSON.stringify(data)})
  const connection={action:'connect',locationId:'tenant-a',provider:'openai',apiKey:'sk-fixture-customer-key-not-a-real-credential',billingAccepted:true}
  assert.equal((await connect({...connection,billingAccepted:false})).status,400)
- assert.equal((await connect(connection,{...headers,Cookie:teamCookie(3814)})).status,403)
+ assert.equal((await connect(connection,{...headers,Cookie:teamCookie(PAID_PORT)})).status,403)
  assert.equal((await connect({...connection,locationId:'tenant-b'})).status,403)
  assert.equal((await connect(connection)).status,200)
  const connected=await(await fetch(base+'/api/workspace?locationId=tenant-a',{headers})).json()
@@ -475,6 +476,24 @@ test('customer OpenAI connection requires acknowledgement, administrator access 
 
  assert.equal((await connect({action:'disconnect',locationId:'tenant-a',provider:'openai'})).status,200)
  assert.equal((await configure(true)).status,409)
+})
+
+test('department validation rejects duplicate and foreign pipelines without altering SLAs',async()=>{
+ const base='http://localhost:' + PAID_PORT,headers={Cookie:await login(PAID_PORT),Origin:base,'Content-Type':'application/json'}
+ const create=pipelineId=>fetch(base+'/api/departments',{method:'POST',headers,body:JSON.stringify({locationId:'tenant-a',name:'Duplicate audit',pipelineId})})
+ assert.equal((await create('nonexistent-other-account')).status,400)
+ assert.equal((await create('fixture-pipeline')).status,409)
+})
+
+test('portal sign-out invalidates the server token, including copied cookies',async()=>{
+ const base='http://localhost:' + PAID_PORT,headers={Cookie:await login(PAID_PORT),Origin:base,'Content-Type':'application/json'}
+ const grant=await(await fetch(base+'/api/tickets/fixture-ticket/portal',{method:'POST',headers,body:JSON.stringify({locationId:'tenant-a'})})).json()
+ const response=await fetch(base+'/api/portal',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({action:'sign-in',token:new URL(grant.url).hash.slice(1)})})
+ assert.equal(response.status,200)
+ const customer={...headers,Cookie:response.headers.get('set-cookie').split(';')[0]}
+ assert.equal((await fetch(base+'/api/portal',{headers:customer})).status,200)
+ assert.equal((await fetch(base+'/api/portal',{method:'POST',headers:customer,body:JSON.stringify({action:'sign-out'})})).status,200)
+ assert.equal((await fetch(base+'/api/portal',{headers:customer})).status,401)
 })
 
 after(() => servers.forEach((server) => server.kill()))
@@ -494,9 +513,9 @@ async function login(port) {
   return cookie.split(';')[0]
 }
 test('isolated encrypted sign-in opens ticket screen without real CRM access', async () => {
-  const cookie = await login(3813)
+  const cookie = await login(FREE_PORT)
   const page = await fetch(
-    'http://localhost:3813/settings/tickets?locationId=tenant-a',
+    'http://localhost:' + FREE_PORT + '/settings/tickets?locationId=tenant-a',
     { headers: { Cookie: cookie } },
   )
   assert.equal(page.status, 200)
@@ -504,8 +523,8 @@ test('isolated encrypted sign-in opens ticket screen without real CRM access', a
 })
 
 test('ticket workspace persists internal notes and response measurements in isolated Postgres', async () => {
-  const base = 'http://localhost:3814',
-    cookie = await login(3814)
+  const base = 'http://localhost:' + PAID_PORT,
+    cookie = await login(PAID_PORT)
   const headers = {
     Cookie: cookie,
     Origin: base,
@@ -609,8 +628,8 @@ test('ticket workspace persists internal notes and response measurements in isol
 })
 
 test('workspace, files and assignments reject other accounts and non-support opportunities', async () => {
-  const base = 'http://localhost:3814',
-    cookie = await login(3814)
+  const base = 'http://localhost:' + PAID_PORT,
+    cookie = await login(PAID_PORT)
   const headers = {
     Cookie: cookie,
     Origin: base,
@@ -673,8 +692,8 @@ test('workspace, files and assignments reject other accounts and non-support opp
   )
 })
 test('isolated free account cannot unlock paid department features', async () => {
-  const base = 'http://localhost:3813',
-    cookie = await login(3813)
+  const base = 'http://localhost:' + FREE_PORT,
+    cookie = await login(FREE_PORT)
   const result = await fetch(base + '/api/departments', {
     method: 'POST',
     headers: {
@@ -695,8 +714,8 @@ test('isolated free account cannot unlock paid department features', async () =>
   assert.match(await report.text(), /available on Pro and Enterprise/)
 })
 test('isolated paid account can configure departments and load reports', async () => {
-  const base = 'http://localhost:3814',
-    cookie = await login(3814)
+  const base = 'http://localhost:' + PAID_PORT,
+    cookie = await login(PAID_PORT)
   const result = await fetch(base + '/api/departments', {
     method: 'POST',
     headers: {
@@ -707,7 +726,7 @@ test('isolated paid account can configure departments and load reports', async (
     body: JSON.stringify({
       locationId: 'tenant-a',
       name: 'Fixture department',
-      pipelineId: 'fixture-pipeline',
+      pipelineId: 'fixture-pipeline-two',
     }),
   })
   assert.equal(result.status, 200)
@@ -721,7 +740,7 @@ test('isolated paid account can configure departments and load reports', async (
 
 async function signedEvent(event) {
   const raw = JSON.stringify(event)
-  return fetch('http://localhost:3813/api/webhooks/ghl', {
+  return fetch('http://localhost:' + FREE_PORT + '/api/webhooks/ghl', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -734,8 +753,14 @@ async function signedEvent(event) {
     body: raw,
   })
 }
+test('failed auto-assignment is retryable and is never acknowledged as completed',async()=>{
+ const event={type:'OpportunityCreate',appId:'fixture-app',locationId:'tenant-a',id:'fixture-unreachable',pipelineId:'fixture-pipeline'}
+ assert.equal((await signedEvent(event)).status,500)
+ assert.equal((await signedEvent(event)).status,500)
+})
+
 test('simulated signed billing upgrades and downgrades without any payment or live CRM access', async () => {
-  const cookie = await login(3813)
+  const cookie = await login(FREE_PORT)
   const upgrade = {
     type: 'PLAN_CHANGE',
     appId: 'fixture-app',
@@ -746,7 +771,7 @@ test('simulated signed billing upgrades and downgrades without any payment or li
   const first = await signedEvent(upgrade)
   assert.equal(first.status, 200)
   const paid = await fetch(
-    'http://localhost:3813/settings/reports?locationId=tenant-a',
+    'http://localhost:' + FREE_PORT + '/settings/reports?locationId=tenant-a',
     { headers: { Cookie: cookie } },
   )
   assert.match(await paid.text(), /Ticket volume/)
@@ -761,7 +786,7 @@ test('simulated signed billing upgrades and downgrades without any payment or li
   const replay = await signedEvent(upgrade)
   assert.equal((await replay.json()).duplicate, true)
   const free = await fetch(
-    'http://localhost:3813/settings/reports?locationId=tenant-a',
+    'http://localhost:' + FREE_PORT + '/settings/reports?locationId=tenant-a',
     { headers: { Cookie: cookie } },
   )
   assert.match(await free.text(), /available on Pro and Enterprise/)
@@ -792,8 +817,8 @@ test('simulated signed billing rejects other apps and unknown plans', async () =
 })
 
 test('included service access keeps paid features without a paid Marketplace subscription', async () => {
-  const base = 'http://localhost:3815',
-    cookie = await login(3815)
+  const base = 'http://localhost:' + INCLUDED_PORT,
+    cookie = await login(INCLUDED_PORT)
   const result = await fetch(base + '/api/departments', {
     method: 'POST',
     headers: {
@@ -804,7 +829,7 @@ test('included service access keeps paid features without a paid Marketplace sub
     body: JSON.stringify({
       locationId: 'tenant-a',
       name: 'Included service department',
-      pipelineId: 'fixture-pipeline',
+      pipelineId: 'fixture-pipeline-two',
     }),
   })
   assert.equal(result.status, 200)
